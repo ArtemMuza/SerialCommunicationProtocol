@@ -1,7 +1,6 @@
 #include <stdio.h>
-#include "../include/SCP.h"
+#include "SCP.h"
 #include "Tests.h"
-
 
 int main() {
 
@@ -16,29 +15,39 @@ int main() {
     CreateSlave(&stm, slaveBuffer);
 
     printf("Frame log:\n");
-    print_bytes( linux.CreateRequest(&linux), REQUEST_SIZE(linux));
+    uint8_t* data = linux.CreateRequest(&linux);
+    print_bytes(data, REQUEST_SIZE(linux));
+    for(int i = 0; ; i++) {
 
-    stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
-    printf("\n");
-
-    if(REQ_TYPE(stm)){
-        stm.WriteData(&stm, regData, 8);
-
-        print_bytes( stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
-        linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
-
-        if(IS_ERROR(linux)) {
-            ShowError(*GET_DATA_PTR(stm));
-            abort();
-        }
-        printf("\nData was read successfully:\n");
-        for(int i =0; i < GET_DATA_LEN(linux); i++){
-            printf("%d ",*(GET_DATA_PTR(linux) + i) );
-        }
+        stm.Read(&stm, *(data+i));
+        if(stm.mode == finish)
+            break;
     }
 
+    if(stm.IsValid(&stm) == no_error){
+        if(REQ_TYPE(stm)){
+            stm.WriteData(&stm, regData, 8);
 
+            data = stm.CreateResponse(&stm);
+            printf("\n");
+            print_bytes(data, RESPONSE_SIZE(stm));
+            for(int i = 0;; i++) {
 
+                linux.Read(&linux, *(data+i));
+                if(linux.mode == finish)
+                    break;
+            }
+
+            if(IS_ERROR(linux)) {
+                ShowError(*GET_DATA_PTR(stm));
+                abort();
+            }
+            printf("\n\nData was read successfully:\n");
+            for(int i =0; i < GET_DATA_LEN(linux); i++){
+                printf("%d ",*(GET_DATA_PTR(linux) + i) );
+            }
+        }
+    }
 
     return 0;
 }

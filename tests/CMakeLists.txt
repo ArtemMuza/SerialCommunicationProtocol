@@ -2,7 +2,11 @@ project(tests)
 
 
 add_executable(ReadRegister ReadRegister.c)
+target_include_directories(ReadRegister PUBLIC ${CMOCKA_INCLUDE_DIR})
+target_link_libraries(ReadRegister ${CMOCKA_LIBRARIES})
 target_link_libraries(ReadRegister  SCP)
+
+
 
 add_executable(WriteRegister WriteRegister.c)
 target_link_libraries(WriteRegister  SCP)

@@ -44,6 +44,15 @@
 #define RESPONSE_SIZE(x) (GetSlavePackageSize(&x) + 6)
 #define REQUEST_SIZE(x) (GetHostPackageSize(&x) + 6)
 
+#define MAX_PROTOCOL_LEN 1024
+#define DATA_START_PLACE 10
+#define HEADER_SIZE      6
+#define SOF_SIZE         2
+#define LEN_SIZE         2
+#define FCS_SIZE         2
+#define REQR_CODE        0x01
+#define REQW_CODE        0x02
+
 enum Error_code {
     no_error,
     incorrect_frame_format,
@@ -71,6 +80,16 @@ enum Frame_type{
     REQW,     //Request to write a register
 };
 
+enum Work_mode {
+    empty,
+    sof,
+    len,
+    header,
+    data,
+    fcs,
+    finish
+};
+
 typedef struct Header{
 
     uint8_t     type;
@@ -85,9 +104,13 @@ typedef struct Host{
     uint8_t* buffer;
     enum Error_code errorCode;
 
+    int frameSize;
+    enum Work_mode  mode;
+
     uint8_t* (*CreateRequest)(struct Host*);
     bool     (*WriteData)(struct Host*,  uint8_t*, size_t);
-    void     (*HandlingResponse)(struct Host*, uint8_t*, size_t);
+    void     (*Read)(struct Host*, uint8_t);
+    enum Error_code (*IsValid)(struct Host*);
 }Host;
 
 void        CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuffer, enum Frame_type _req);
@@ -101,9 +124,13 @@ typedef struct Slave{
     uint8_t* buffer;
     enum Error_code errorCode;
 
+    int frameSize;
+    enum Work_mode  mode;
+
     uint8_t* (*CreateResponse)(struct Slave*);
     bool     (*WriteData)(struct Slave*, uint8_t*, size_t);
-    void     (*HandlingRequest)(struct Slave*, uint8_t*, size_t);
+    void     (*Read)(struct Slave*, uint8_t);
+    enum Error_code (*IsValid)(struct Slave*);
 }Slave;
 
 void CreateSlave(Slave* _slave, uint8_t* _dataBuffer);

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../include/SCP.h"
+#include "SCP.h"
 #include "Tests.h"
 
 
@@ -18,14 +18,14 @@ int main() {
     printf("Frame log:\n");
     print_bytes(linux.CreateRequest(&linux), REQUEST_SIZE(linux));
 
-    stm.HandlingRequest(&stm, randomData, 16);
+   // stm.HandlingRequest(&stm, randomData, 16);
     printf("\n");
 
     if(REQ_TYPE(stm)){
         stm.WriteData(&stm, regData, 8);
 
         print_bytes( stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
-        linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
+     //   linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
 
         if(IS_ERROR(linux)) {
             ShowError(*GET_DATA_PTR(stm));

@@ -1,5 +1,11 @@
-#include "../include/SCP.h"
+#include "SCP.h"
 #include <string.h>
+
+#define SET_1ST_BIT(x) (x |= 0x80)
+#define RESERVED_REGISTER_COUNT 2
+static const uint16_t ReservedRegistersAddr[] = {
+        0x0000, 0xFFFF
+};
 
 static const unsigned short Crc16Table[256] = {
         0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
@@ -44,7 +50,8 @@ static bool CheckRegisterAddr(uint16_t _addr);
 //HOST
 static uint8_t* CreateRequest(Host* _host);
 static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen);
-static void HandlingResponse(Host* _host,  uint8_t* _data, size_t _dataSize);
+static enum Error_code IsHostValid(Host* _host);
+static void ReadHost(Host* _host, uint8_t _byte);
 
 void CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuffer, enum Frame_type _req) {
     //Add buffer  length handler
@@ -55,10 +62,12 @@ void CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuf
     _host->header.cmd1 = _register;
     _host->header.cmd2 = 0;
     _host->errorCode   = no_error;
+    _host->mode = empty;
 
     _host->WriteData = &WriteHostData;
     _host->CreateRequest = &CreateRequest;
-    _host->HandlingResponse = &HandlingResponse;
+    _host->Read = &ReadHost;
+    _host->IsValid = &IsHostValid;
     if(_dataBuffer)
         _host->buffer = _dataBuffer;
     else {
@@ -66,22 +75,122 @@ void CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuf
         _host->errorCode = incorrect_data_value;
     }
 }
+static void ReadHost(Host* _host, uint8_t _byte){
+
+    switch (_host->mode) {
+        case empty: {
+            if(_byte == (SOF & 0xff)) {
+                _host->mode = sof;
+                _host->frameSize = 1;
+                _host->buffer[0] = _byte;
+            }
+        }  break;
+        case sof: {
+            if(_byte == (SOF >> 8)) {
+                _host->mode = len;
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+            } else {
+                _host->mode = empty;
+                _host->frameSize = 0;
+            }
+        }  break;
+        case len: {
+            if(_host->frameSize == SOF_SIZE) {
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+            } else {
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+                _host->mode = header;
+            }
+        }  break;
+        case header: {
+            switch (_host->frameSize) {
+                case SOF_SIZE + LEN_SIZE://type
+                    _host->header.type = _byte;
+                case SOF_SIZE + LEN_SIZE + 1://cmd0
+                    _host->header.cmd0 = _byte;
+                case SOF_SIZE + LEN_SIZE + 2://cmd1(1)
+                    _host->header.cmd1 = _byte;
+                case SOF_SIZE + LEN_SIZE + 3://cmd1(2)
+                    _host->header.cmd1 += _byte << 8;
+                case SOF_SIZE + LEN_SIZE + 4://cmd2(1)
+                    _host->header.cmd2 = _byte;
+                    _host->buffer[_host->frameSize] = _byte;
+                    _host->frameSize++;
+                    break;
+                default://cmd2(2)
+                    _host->header.cmd2 += _byte << 8;
+                    _host->buffer[_host->frameSize] = _byte;
+                    _host->frameSize++;
+                    _host->mode = data;
+                    break;
+            }
+        }  break;
+        case data: {
+            if(_host->frameSize < (_host->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE - 1)) {
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+            } else {
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+                _host->mode = fcs;
+            }
+        }  break;
+        case fcs: {
+            if(_host->frameSize < (_host->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 2)) {
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+            } else {
+                _host->buffer[_host->frameSize] = _byte;
+                _host->frameSize++;
+                _host->mode = finish;
+            }
+        }  break;
+    }
+}
+static enum Error_code IsHostValid(Host* _host) {
+    if(_host->mode != finish)
+        return incorrect_frame_format;
+
+    if(!CheckType(_host->header.type))
+        _host->errorCode = incorrect_type;
+
+    if(!CheckMPU(_host->header.cmd0))
+        _host->errorCode = incorrect_mpu_address;
+
+    if(!CheckRegisterAddr(_host->header.cmd1))
+        _host->errorCode = incorrect_register_address;
+
+    if (_host->header.type == REQR_CODE && _host->header.cmd2 != 0)
+        _host->errorCode = incorrect_data_length;
+
+    uint16_t crc = _host->buffer[_host->header.cmd2 + DATA_START_PLACE];
+    crc += _host->buffer[_host->header.cmd2 + 1 + DATA_START_PLACE] << 8;
+
+    if (crc != Crc16(_host->buffer + LEN_SIZE, _host->header.cmd2 + HEADER_SIZE + LEN_SIZE))
+        _host->errorCode = slave_data_integrity;
+
+
+    return _host->errorCode;
+}
 static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen) {
 
-    if(_dataLen > 1018 || !_data || !_host->buffer)
+    if(_dataLen > (MAX_PROTOCOL_LEN - HEADER_SIZE) || !_data || !_host->buffer)
         return false;
 
     for(int i = 0; i < _dataLen; i++)
-        _host->buffer[i + 10] = _data[i];
+        _host->buffer[i + DATA_START_PLACE] = _data[i];
     _host->header.cmd2 = _dataLen;
     return true;
 }
 uint16_t GetHostPackageSize(Host* _host) {
-    uint16_t size =  6;
+    uint16_t size =  HEADER_SIZE;
     size += _host->header.cmd2;
 
-    if(_host->header.type & 0x01)
-        return 6;
+    if(_host->header.type & REQR_CODE)
+        return HEADER_SIZE;
     return size;
 }
 static uint8_t* CreateRequest(Host* _host) {
@@ -114,97 +223,47 @@ static uint8_t* CreateRequest(Host* _host) {
     _host->buffer[2] = GetHostPackageSize(_host) & 0xff;//lsb
     _host->buffer[3] = GetHostPackageSize(_host) >> 8; //msb
 
-    uint16_t crc = Crc16(_host->buffer + 2, _host->header.cmd2 + 8);
-    _host->buffer[_host->header.cmd2 + 10] = crc & 0xff;
-    _host->buffer[_host->header.cmd2 + 11] = crc >> 8 ;
+    uint16_t crc = Crc16(_host->buffer + LEN_SIZE, _host->header.cmd2 + HEADER_SIZE + LEN_SIZE);
+    _host->buffer[_host->header.cmd2 + DATA_START_PLACE] = crc & 0xff;
+    _host->buffer[_host->header.cmd2 + DATA_START_PLACE + 1] = crc >> 8 ;
 
 
     return _host->buffer;
 }
-static void HandlingResponse(Host* _host,  uint8_t* _data, size_t _dataSize) {
 
-    if(!_data || !_host->buffer)
-        return;
-
-    int i;
-    for(i  = 0; i < _dataSize; i++)
-        if((_data[i] == 0xAA) && (i < _dataSize - 1) && (_data[i+1] == 0x55))
-            break;
-
-    if(i == _dataSize){
-        _host->errorCode = incorrect_frame_format;
-        return;
-    }
-    uint16_t frameLen  = _data[i+2];
-    frameLen += _data[i+3] << 8;
-    if(frameLen < 6)
-        _host->errorCode = incorrect_frame_format;
-
-    i+=4;
-    _host->header.type = _data[i++];
-    _host->header.cmd0 = _data[i];
-    _host->header.cmd1 = _data[++i];
-    _host->header.cmd1 += _data[++i] << 8;
-
-    if(!CheckType(_host->header.type))
-        _host->errorCode = incorrect_type;
-
-    if(!CheckMPU(_host->header.cmd0))
-        _host->errorCode = incorrect_mpu_address;
-
-    if(!CheckRegisterAddr(_host->header.cmd1))
-        _host->errorCode = incorrect_register_address;
-
-
-    _host->header.cmd2 = _data[++i];
-    _host->header.cmd2 += _data[++i] << 8;
-
-    if((_host->header.type & 0x02) && _host->header.cmd2 != 1)
-        _host->errorCode = incorrect_data_length;
-
-    for(int j = 0; j < _host->header.cmd2; j++)
-        _host->buffer[10 + j] = _data[++i];
-
-    if((_host->header.type & 0x02) && _host->buffer[10] > slave_busy)
-        _host->errorCode = incorrect_data_value;
-
-
-
-    uint16_t crc = _data[_host->header.cmd2 + 10];
-    crc += _data[_host->header.cmd2 + 11] << 8;
-
-    if(crc != Crc16(_data + 2, _host->header.cmd2+8)) {
-
-        _host->errorCode = slave_data_integrity;
-        return;
-    }
-}
 bool SetRegisterAddr(Host* _host, uint16_t _addr) {
-    if(_addr == 0x0000 || _addr == 0xFFFF)
-        return false;
+    for(int i = 0; i < RESERVED_REGISTER_COUNT; i++) {
+        if (_addr == ReservedRegistersAddr[i])
+            return false;
+    }
+
     _host->header.cmd1 = _addr;
     return true;
 }
 void ChangeFrameType(Host* _host, enum Frame_type _type){
     if(_type == REQR)
-        _host->header.type = 0x01;
+        _host->header.type = REQR_CODE;
     else
-        _host->header.type = 0x02;
+        _host->header.type = REQW_CODE;
 }
 
 //SLAVE
 static bool WriteSlaveData(Slave* _slave,  uint8_t* _data, size_t _dataLen);
-static void HandleRequest(Slave*,  uint8_t*, size_t);
 static uint8_t* CreateResponse(Slave*);
+static void ReadSlave(Slave* _slave, uint8_t _byte);
+static enum Error_code IsSlaveValid(Slave* _slave);
 
 void CreateSlave(Slave* _slave, uint8_t* _dataBuffer) {
 
     _slave->header.cmd2 = 0;
     _slave->errorCode   = no_error;
+    _slave->frameSize   = 0;
+    _slave->mode = empty;
 
     _slave->WriteData = &WriteSlaveData;
-    _slave->HandlingRequest = &HandleRequest;
     _slave->CreateResponse = &CreateResponse;
+    _slave->Read = &ReadSlave;
+    _slave->IsValid = &IsSlaveValid;
     if(_dataBuffer)
         _slave->buffer = _dataBuffer;
     else {
@@ -212,49 +271,85 @@ void CreateSlave(Slave* _slave, uint8_t* _dataBuffer) {
         _slave->errorCode = incorrect_data_value;
     }
 }
-static bool WriteSlaveData(Slave* _slave,  uint8_t* _data, size_t _dataLen) {
+static void ReadSlave(Slave* _slave, uint8_t _byte) {
 
-    if(_dataLen > 1018 || !_data || !_slave->buffer)
-        return false;
-
-    for(int i = 0; i < _dataLen; i++)
-        _slave->buffer[i + 10] = _data[i];
-    _slave->header.cmd2 = _dataLen;
-    return true;
-}
-uint16_t GetSlavePackageSize(Slave* _slave) {
-    uint16_t size =  6;
-    size += _slave->header.cmd2;
-    if(_slave->header.type & 0x02 || _slave->errorCode != no_error)
-        return 7;
-    return size;
-}
-static void HandleRequest(Slave* _slave,  uint8_t* _data, size_t _dataSize) {
-
-    if(!_data || !_slave->buffer)
-        return;
-
-    int i;
-    for(i  = 0; i < _dataSize; i++)
-        if((_data[i] == 0xAA) && (i < _dataSize - 1) && (_data[i+1] == 0x55))
-            break;
-
-    //Add length comparing
-    if(i == _dataSize){
-        _slave->errorCode = incorrect_frame_format;
-        return;
+    switch (_slave->mode) {
+        case empty: {
+            if(_byte == (SOF & 0xff)) {
+                _slave->mode = sof;
+                _slave->frameSize = 1;
+                _slave->buffer[0] = _byte;
+            }
+        }  break;
+        case sof: {
+            if(_byte == (SOF >> 8)) {
+                _slave->mode = len;
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+            } else {
+                _slave->mode = empty;
+                _slave->frameSize = 0;
+            }
+        }  break;
+        case len: {
+            if(_slave->frameSize == SOF_SIZE) {
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+            } else {
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+                _slave->mode = header;
+            }
+        }  break;
+        case header: {
+            switch (_slave->frameSize) {
+                case SOF_SIZE + LEN_SIZE://type
+                    _slave->header.type = _byte;
+                case SOF_SIZE + LEN_SIZE + 1://cmd0
+                    _slave->header.cmd0 = _byte;
+                case SOF_SIZE + LEN_SIZE + 2://cmd1(1)
+                    _slave->header.cmd1 = _byte;
+                case SOF_SIZE + LEN_SIZE + 3://cmd1(2)
+                    _slave->header.cmd1 += _byte << 8;
+                case SOF_SIZE + LEN_SIZE + 4://cmd2(1)
+                    _slave->header.cmd2 = _byte;
+                    _slave->buffer[_slave->frameSize] = _byte;
+                    _slave->frameSize++;
+                    break;
+                default://cmd2(2)
+                    _slave->header.cmd2 += _byte << 8;
+                    _slave->buffer[_slave->frameSize] = _byte;
+                    _slave->frameSize++;
+                    _slave->mode = data;
+                    break;
+            }
+        }  break;
+        case data: {
+            if(_slave->frameSize < (_slave->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE - 1)) {
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+            } else {
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+                _slave->mode = fcs;
+            }
+        }  break;
+        case fcs: {
+            if(_slave->frameSize < (_slave->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+            } else {
+                _slave->buffer[_slave->frameSize] = _byte;
+                _slave->frameSize++;
+                _slave->mode = finish;
+            }
+        }  break;
     }
+}
+static enum Error_code IsSlaveValid(Slave* _slave) {
 
-    uint16_t frameLen  = _data[i+2];
-    frameLen += _data[i+3] << 8;
-    if(frameLen < 6)
-        _slave->errorCode = incorrect_frame_format;
-
-    i+=4;
-    _slave->header.type = _data[i++];
-    _slave->header.cmd0 = _data[i];
-    _slave->header.cmd1 = _data[++i];
-    _slave->header.cmd1 += _data[++i] << 8;
+    if(_slave->mode != finish)
+        return incorrect_frame_format;
 
     if(!CheckType(_slave->header.type))
         _slave->errorCode = incorrect_type;
@@ -265,26 +360,34 @@ static void HandleRequest(Slave* _slave,  uint8_t* _data, size_t _dataSize) {
     if(!CheckRegisterAddr(_slave->header.cmd1))
         _slave->errorCode = incorrect_register_address;
 
-    _slave->header.cmd2 = _data[++i];
-    _slave->header.cmd2 += _data[++i] << 8;
-
-
-    if (_slave->header.type == 0x01 && _slave->header.cmd2 != 0)
+    if (_slave->header.type == REQR_CODE && _slave->header.cmd2 != 0)
         _slave->errorCode = incorrect_data_length;
 
-    if(_slave->errorCode == no_error) {
-        for (int j = 0; j < _slave->header.cmd2; j++)
-            _slave->buffer[10 + j] = _data[++i];
+    uint16_t crc = _slave->buffer[_slave->header.cmd2 + DATA_START_PLACE];
+    crc += _slave->buffer[_slave->header.cmd2 + 1 + DATA_START_PLACE] << 8;
 
-        uint16_t crc = _data[_slave->header.cmd2 + 10];
-        crc += _data[_slave->header.cmd2 + 11] << 8;
+    if (crc != Crc16(_slave->buffer + LEN_SIZE, _slave->header.cmd2 + HEADER_SIZE + LEN_SIZE))
+        _slave->errorCode = slave_data_integrity;
 
-        if (crc != Crc16(_data + 2, _slave->header.cmd2 + 8)) {
 
-            _slave->errorCode = slave_data_integrity;
-            return;
-        }
-    }
+    return _slave->errorCode;
+}
+static bool WriteSlaveData(Slave* _slave,  uint8_t* _data, size_t _dataLen) {
+
+    if(_dataLen > MAX_PROTOCOL_LEN - HEADER_SIZE || !_data || !_slave->buffer)
+        return false;
+
+    for(int i = 0; i < _dataLen; i++)
+        _slave->buffer[i + DATA_START_PLACE] = _data[i];
+    _slave->header.cmd2 = _dataLen;
+    return true;
+}
+uint16_t GetSlavePackageSize(Slave* _slave) {
+    uint16_t size =  HEADER_SIZE;
+    size += _slave->header.cmd2;
+    if(_slave->header.type & REQW_CODE || _slave->errorCode != no_error)
+        return HEADER_SIZE + 1;
+    return size;
 }
 static uint8_t* CreateResponse(Slave* _slave) {
     if(!_slave->buffer)
@@ -303,7 +406,7 @@ static uint8_t* CreateResponse(Slave* _slave) {
     _slave->buffer[7] = _slave->header.cmd1 >> 8;
 
     if(_slave->errorCode == no_error) {
-        if(_slave->header.type & 0x01){
+        if(_slave->header.type & REQR_CODE){
 
             _slave->buffer[8] = _slave->header.cmd2 & 0xff;
             _slave->buffer[9] = _slave->header.cmd2 >> 8;
@@ -311,7 +414,7 @@ static uint8_t* CreateResponse(Slave* _slave) {
         } else {
 
             _slave->header.cmd2 = 1;
-            _slave->buffer[8] = 0x01;
+            _slave->buffer[8] = 0x01;//Size = 1 because it will contain only err code
             _slave->buffer[9] = 0x00;
 
             _slave->buffer[10] = _slave->errorCode;
@@ -319,10 +422,9 @@ static uint8_t* CreateResponse(Slave* _slave) {
         }
 
     } else {
-        _slave->buffer[4] |= 0x80;
-
+        SET_1ST_BIT(_slave->buffer[4]);
         _slave->header.cmd2 = 1;
-        _slave->buffer[8] = 0x01;
+        _slave->buffer[8] = 0x01;//Size = 1 because it will contain only err code
         _slave->buffer[9] = 0x00;
 
         _slave->buffer[10] = _slave->errorCode;
@@ -330,9 +432,9 @@ static uint8_t* CreateResponse(Slave* _slave) {
     _slave->buffer[2] = GetSlavePackageSize(_slave) & 0xff;
     _slave->buffer[3] = GetSlavePackageSize(_slave) >> 8;
 
-    uint16_t crc = Crc16(_slave->buffer + 2, GetSlavePackageSize(_slave) + 2);
-    _slave->buffer[_slave->header.cmd2 + 10] = crc & 0xff;
-    _slave->buffer[_slave->header.cmd2 + 11] = crc >> 8;
+    uint16_t crc = Crc16(_slave->buffer + LEN_SIZE, GetSlavePackageSize(_slave) + 2);
+    _slave->buffer[_slave->header.cmd2 + DATA_START_PLACE] = crc & 0xff;
+    _slave->buffer[_slave->header.cmd2 + 1 + DATA_START_PLACE] = crc >> 8;
 
     return _slave->buffer;
 }

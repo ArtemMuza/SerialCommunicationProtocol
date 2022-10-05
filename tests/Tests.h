@@ -4,8 +4,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "../include/SCP.h"
-
+#include "SCP.h"
 
 
 void print_bytes(const unsigned char* _data, size_t len){

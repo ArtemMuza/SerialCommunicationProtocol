@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "../include/SCP.h"
+#include "SCP.h"
 #include "Tests.h"
 
 int main() {
@@ -16,11 +16,11 @@ int main() {
 
     printf("no_error check:");
 
-    stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
+   // stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
     if (REQ_TYPE(stm)) {
         stm.WriteData(&stm, regData,8);
     }
-    linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
+   // linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
 
     ShowError(linux.errorCode);
     if(IS_ERROR(linux))
@@ -31,11 +31,11 @@ int main() {
     CreateHost(&linux, addr_linux, 18, hostBuffer, REQR);
     linux.header.type = 0x71;
 
-    stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
+  //  stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
     if (REQ_TYPE(stm)) {
         stm.WriteData(&stm, regData,8);
     }
-    linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
+  //  linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
 
     ShowError(*GET_DATA_PTR(linux));
     if(!IS_ERROR(linux))
@@ -45,11 +45,11 @@ int main() {
     CreateHost(&linux, addr_linux, 18, hostBuffer, REQR);
     linux.header.cmd0 = 0xFF;
 
-    stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
+  //  stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
     if (REQ_TYPE(stm)) {
         stm.WriteData(&stm, regData,8);
     }
-    linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
+  //  linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
 
     ShowError(*GET_DATA_PTR(linux));
     if(!IS_ERROR(linux))
@@ -59,11 +59,11 @@ int main() {
     CreateHost(&linux, addr_linux, 18, hostBuffer, REQR);
     linux.header.cmd1 = 0xFFFF;
 
-    stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
+  //  stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
     if (REQ_TYPE(stm)) {
         stm.WriteData(&stm, regData,8);
     }
-    linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
+  //  linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
 
     ShowError(*GET_DATA_PTR(linux));
     if(!IS_ERROR(linux))
@@ -74,11 +74,11 @@ int main() {
     CreateHost(&linux, addr_linux, 18, hostBuffer, REQR);
     linux.WriteData(&linux, regData, 8);
 
-    stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
+    //stm.HandlingRequest(&stm, linux.CreateRequest(&linux), REQUEST_SIZE(linux));
     if (REQ_TYPE(stm)) {
         stm.WriteData(&stm, regData,8);
     }
-    linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
+  //  linux.HandlingResponse(&linux, stm.CreateResponse(&stm), RESPONSE_SIZE(stm));
 
     ShowError(*GET_DATA_PTR(linux));
     if(!IS_ERROR(linux))
