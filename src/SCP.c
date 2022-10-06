@@ -149,7 +149,8 @@ static void ReadHost(Host* _host, uint8_t _byte){
             }
         }  break;
         case finish: {
-
+            _host->mode = empty;
+            _host->Read(_host, _byte);
         } break;
     }
 }
@@ -349,6 +350,10 @@ static void ReadSlave(Slave* _slave, uint8_t _byte) {
                 _slave->mode = finish;
             }
         }  break;
+        case finish: {
+            _slave->mode = empty;
+            _slave->Read(_slave, _byte);
+        } break;
     }
 }
 static enum Error_code IsSlaveValid(Slave* _slave) {
