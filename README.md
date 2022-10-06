@@ -8,6 +8,10 @@ mkdir build && cd build
 cmake ..
 make
 ```
+Library out directory:
+```
+SerialCommunicationProtocol/build/build/src/libSCP.a
+```
 Tests out directory:
 ```
 SerialCommunicationProtocol/build/build/tests/
