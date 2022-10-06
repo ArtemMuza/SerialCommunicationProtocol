@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "SCP.h"
+#include "Tests.h"
 #include <cmocka.h>
 
 uint8_t hostBuffer[1024];
@@ -23,10 +24,10 @@ static void ReadTest(void** state){
 
     uint8_t* data = linux.CreateRequest(&linux);
 
-    for(int i = 0; ; i++) {
+    for(int i = 0; i < REQUEST_SIZE(linux) ; i++) {
         stm.Read(&stm, *(data+i));
-        if(stm.mode == finish)
-            break;
+        if (i != REQUEST_SIZE(linux) - 1)
+            assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), no_error);
 
@@ -35,12 +36,13 @@ static void ReadTest(void** state){
 
         data = stm.CreateResponse(&stm);
 
-        for(int i = 0;; i++) {
-
+        for(int i = 0; i < RESPONSE_SIZE(stm) ; i++) {
             linux.Read(&linux, *(data+i));
-            if(linux.mode == finish)
-                break;
+            if (i != RESPONSE_SIZE(stm) -1)
+                assert_int_not_equal(linux.IsValid(&linux), no_error);
         }
+
+        assert_int_equal(linux.IsValid(&linux), no_error);
         assert_false(IS_ERROR(linux));
         assert_memory_equal(GET_DATA_PTR(linux), regData, 8);
 
@@ -57,21 +59,21 @@ static void WriteTest(void** state) {
     linux.WriteData(&linux, regData, 8);
 
     uint8_t* data = linux.CreateRequest(&linux);
-    for(int i = 0; ; i++) {
+    for(int i = 0; i < REQUEST_SIZE(linux); i++) {
 
         stm.Read(&stm, *(data+i));
-        if(stm.mode == finish)
-            break;
+        if( i != REQUEST_SIZE(linux) - 1)
+            assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), no_error);
 
     if(!REQ_TYPE(stm)){
         data = stm.CreateResponse(&stm);
-        for(int i = 0;; i++) {
+        for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
 
             linux.Read(&linux, *(data+i));
-            if(linux.mode == finish)
-                break;
+            if( i != RESPONSE_SIZE(stm) - 1)
+                assert_int_not_equal(linux.IsValid(&linux), no_error);
         }
         assert_false(IS_ERROR(linux));
         assert_int_equal(*(GET_DATA_PTR(linux)), no_error);
@@ -100,22 +102,20 @@ static void RandomDataFirst(void** state) {
     linux.WriteData(&linux, regData, 8);
 
     uint8_t* data = linux.CreateRequest(&linux)  - 10;
-    for(int i = 0; ; i++) {
-
+    for(int i = 0; i < REQUEST_SIZE(linux) + 10 ; i++) {
         stm.Read(&stm, *(data+i));
-        if(stm.mode == finish)
-            break;
+        if ( i != REQUEST_SIZE(linux) + 9)
+            assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), no_error);
-
     if(!REQ_TYPE(stm)){
         data = stm.CreateResponse(&stm);
-        for(int i = 0;; i++) {
-
+        for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
             linux.Read(&linux, *(data+i));
-            if(linux.mode == finish)
-                break;
+            if ( i != RESPONSE_SIZE(stm) - 1)
+                assert_int_not_equal(linux.IsValid(&linux), no_error);
         }
+        assert_int_equal(linux.IsValid(&linux), no_error);
         assert_false(IS_ERROR(linux));
         assert_int_equal(*(GET_DATA_PTR(linux)), no_error);
     }
@@ -131,10 +131,10 @@ static void CallError(void** state) {
 
     uint8_t* data = linux.CreateRequest(&linux);
 
-    for(int i = 0; ; i++) {
+    for(int i = 0; i < REQUEST_SIZE(linux); i++) {
         stm.Read(&stm, *(data+i));
-        if(stm.mode == finish)
-            break;
+        if( i != REQUEST_SIZE(linux))
+            assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), incorrect_register_address);
 
@@ -143,11 +143,11 @@ static void CallError(void** state) {
 
         data = stm.CreateResponse(&stm);
 
-        for(int i = 0;; i++) {
+        for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
 
             linux.Read(&linux, *(data+i));
-            if(linux.mode == finish)
-                break;
+            if( i != RESPONSE_SIZE(stm) - 1)
+                assert_int_not_equal(linux.IsValid(&linux), no_error);
         }
         assert_true(IS_ERROR(linux));
         assert_int_equal(*(GET_DATA_PTR(linux)), incorrect_register_address);
@@ -176,21 +176,20 @@ static void RandomDataSOF(void** state) {
     linux.WriteData(&linux, regData, 8);
 
     uint8_t* data = linux.CreateRequest(&linux)  - 10;
-    for(int i = 0; ; i++) {
+    for(int i = 0; i < REQUEST_SIZE(linux); i++) {
 
         stm.Read(&stm, *(data+i));
-        if(stm.mode == finish)
-            break;
+        if( i != REQUEST_SIZE(linux) - 1)
+            assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
-
     assert_false(stm.IsValid(&stm) == no_error);
 
     data = stm.CreateResponse(&stm);
-    for(int i = 0;; i++) {
+    for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
 
         linux.Read(&linux, *(data+i));
-        if(linux.mode == finish)
-            break;
+        if( i != RESPONSE_SIZE(stm) - 1)
+            assert_int_not_equal(linux.IsValid(&linux), no_error);
     }
     assert_true(IS_ERROR(linux));
 }

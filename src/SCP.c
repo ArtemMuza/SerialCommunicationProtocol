@@ -139,7 +139,7 @@ static void ReadHost(Host* _host, uint8_t _byte){
             }
         }  break;
         case fcs: {
-            if(_host->frameSize < (_host->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 2)) {
+            if(_host->frameSize < (_host->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
                 _host->buffer[_host->frameSize] = _byte;
                 _host->frameSize++;
             } else {
@@ -148,6 +148,9 @@ static void ReadHost(Host* _host, uint8_t _byte){
                 _host->mode = finish;
             }
         }  break;
+        case finish: {
+
+        } break;
     }
 }
 static enum Error_code IsHostValid(Host* _host) {
@@ -163,15 +166,17 @@ static enum Error_code IsHostValid(Host* _host) {
     if(!CheckRegisterAddr(_host->header.cmd1))
         _host->errorCode = incorrect_register_address;
 
-    if (_host->header.type == REQR_CODE && _host->header.cmd2 != 0)
+    if (_host->header.type == REQR_CODE && _host->header.cmd2 == 0)
         _host->errorCode = incorrect_data_length;
 
     uint16_t crc = _host->buffer[_host->header.cmd2 + DATA_START_PLACE];
     crc += _host->buffer[_host->header.cmd2 + 1 + DATA_START_PLACE] << 8;
 
-    if (crc != Crc16(_host->buffer + LEN_SIZE, _host->header.cmd2 + HEADER_SIZE + LEN_SIZE))
+    if (crc != Crc16(_host->buffer + SOF_SIZE, _host->header.cmd2 + HEADER_SIZE + LEN_SIZE))
         _host->errorCode = slave_data_integrity;
 
+    if(_host->frameSize < 12, _host->frameSize < GetHostPackageSize(_host))
+        return incorrect_frame_format;
 
     return _host->errorCode;
 }
@@ -369,6 +374,8 @@ static enum Error_code IsSlaveValid(Slave* _slave) {
     if (crc != Crc16(_slave->buffer + LEN_SIZE, _slave->header.cmd2 + HEADER_SIZE + LEN_SIZE))
         _slave->errorCode = slave_data_integrity;
 
+    if(_slave->frameSize < 12 || _slave->frameSize < GetSlavePackageSize(_slave))
+        return incorrect_frame_format;
 
     return _slave->errorCode;
 }

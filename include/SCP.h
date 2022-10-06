@@ -41,8 +41,8 @@
 #define GET_DATA_PTR(x)  ((x.buffer ) ? (x.buffer + 10) : NULL)
 #define GET_DATA_LEN(x) (x.header.cmd2)
 #define GET_REG_ADDR(x) (x.header.cmd1)
-#define RESPONSE_SIZE(x) (GetSlavePackageSize(&x) + 6)
-#define REQUEST_SIZE(x) (GetHostPackageSize(&x) + 6)
+#define RESPONSE_SIZE(slave) (GetSlavePackageSize(&slave) + 6)
+#define REQUEST_SIZE(host) (GetHostPackageSize(&host) + 6)
 
 #define MAX_PROTOCOL_LEN 1024
 #define DATA_START_PLACE 10
