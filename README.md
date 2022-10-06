@@ -13,7 +13,7 @@ Tests out directory:
 SerialCommunicationProtocol/build/build/tests/
 ```
 ## How to use
-- Allocating buffers for Host|Slave (max_length = 1048)
+- Allocating buffers for Host|Slave (max_length = 1024)
 ```c++
 uint8_t hostBuffer[1024];
 uint8_t slaveBuffer[1024];
