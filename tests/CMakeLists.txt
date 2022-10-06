@@ -1,4 +1,4 @@
-project(tests)
+project(tests C)
 
 
 add_executable(CmockaTest CmockaTest.c)

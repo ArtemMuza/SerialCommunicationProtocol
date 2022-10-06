@@ -16,17 +16,17 @@ static void ReadTest(void** state){
     (void) state;
 
     //Creating Host | Slave
-    Host linux;
+    Host pc;
     Slave stm;
-    CreateHost(&linux, addr_linux, 18, hostBuffer, REQR);
+    CreateHost(&pc, addr_linux, 18, hostBuffer, REQR);
     CreateSlave(&stm, slaveBuffer);
 
 
-    uint8_t* data = linux.CreateRequest(&linux);
+    uint8_t* data = pc.CreateRequest(&pc);
 
-    for(int i = 0; i < REQUEST_SIZE(linux) ; i++) {
+    for(int i = 0; i < REQUEST_SIZE(pc) ; i++) {
         stm.Read(&stm, *(data+i));
-        if (i != REQUEST_SIZE(linux) - 1)
+        if (i != REQUEST_SIZE(pc) - 1)
             assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), no_error);
@@ -37,32 +37,32 @@ static void ReadTest(void** state){
         data = stm.CreateResponse(&stm);
 
         for(int i = 0; i < RESPONSE_SIZE(stm) ; i++) {
-            linux.Read(&linux, *(data+i));
+            pc.Read(&pc, *(data + i));
             if (i != RESPONSE_SIZE(stm) -1)
-                assert_int_not_equal(linux.IsValid(&linux), no_error);
+                assert_int_not_equal(pc.IsValid(&pc), no_error);
         }
 
-        assert_int_equal(linux.IsValid(&linux), no_error);
-        assert_false(IS_ERROR(linux));
-        assert_memory_equal(GET_DATA_PTR(linux), regData, 8);
+        assert_int_equal(pc.IsValid(&pc), no_error);
+        assert_false(IS_ERROR(pc));
+        assert_memory_equal(GET_DATA_PTR(pc), regData, 8);
 
     }
 }
 static void WriteTest(void** state) {
     (void) state;
 
-    Host linux;
+    Host pc;
     Slave stm;
-    CreateHost(&linux, addr_linux, 18, hostBuffer, REQW);
+    CreateHost(&pc, addr_linux, 18, hostBuffer, REQW);
     CreateSlave(&stm, slaveBuffer);
 
-    linux.WriteData(&linux, regData, 8);
+    pc.WriteData(&pc, regData, 8);
 
-    uint8_t* data = linux.CreateRequest(&linux);
-    for(int i = 0; i < REQUEST_SIZE(linux); i++) {
+    uint8_t* data = pc.CreateRequest(&pc);
+    for(int i = 0; i < REQUEST_SIZE(pc); i++) {
 
         stm.Read(&stm, *(data+i));
-        if( i != REQUEST_SIZE(linux) - 1)
+        if( i != REQUEST_SIZE(pc) - 1)
             assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), no_error);
@@ -71,12 +71,12 @@ static void WriteTest(void** state) {
         data = stm.CreateResponse(&stm);
         for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
 
-            linux.Read(&linux, *(data+i));
+            pc.Read(&pc, *(data + i));
             if( i != RESPONSE_SIZE(stm) - 1)
-                assert_int_not_equal(linux.IsValid(&linux), no_error);
+                assert_int_not_equal(pc.IsValid(&pc), no_error);
         }
-        assert_false(IS_ERROR(linux));
-        assert_int_equal(*(GET_DATA_PTR(linux)), no_error);
+        assert_false(IS_ERROR(pc));
+        assert_int_equal(*(GET_DATA_PTR(pc)), no_error);
     }
 }
 static void RandomDataFirst(void** state) {
@@ -94,46 +94,46 @@ static void RandomDataFirst(void** state) {
     hostBuffer[9] = 0x02;
 
 
-    Host linux;
+    Host pc;
     Slave stm;
-    CreateHost(&linux, addr_linux, 18, hostBuffer + 10, REQW);
+    CreateHost(&pc, addr_linux, 18, hostBuffer + 10, REQW);
     CreateSlave(&stm, slaveBuffer);
 
-    linux.WriteData(&linux, regData, 8);
+    pc.WriteData(&pc, regData, 8);
 
-    uint8_t* data = linux.CreateRequest(&linux)  - 10;
-    for(int i = 0; i < REQUEST_SIZE(linux) + 10 ; i++) {
+    uint8_t* data = pc.CreateRequest(&pc) - 10;
+    for(int i = 0; i < REQUEST_SIZE(pc) + 10 ; i++) {
         stm.Read(&stm, *(data+i));
-        if ( i != REQUEST_SIZE(linux) + 9)
+        if ( i != REQUEST_SIZE(pc) + 9)
             assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), no_error);
     if(!REQ_TYPE(stm)){
         data = stm.CreateResponse(&stm);
         for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
-            linux.Read(&linux, *(data+i));
+            pc.Read(&pc, *(data + i));
             if ( i != RESPONSE_SIZE(stm) - 1)
-                assert_int_not_equal(linux.IsValid(&linux), no_error);
+                assert_int_not_equal(pc.IsValid(&pc), no_error);
         }
-        assert_int_equal(linux.IsValid(&linux), no_error);
-        assert_false(IS_ERROR(linux));
-        assert_int_equal(*(GET_DATA_PTR(linux)), no_error);
+        assert_int_equal(pc.IsValid(&pc), no_error);
+        assert_false(IS_ERROR(pc));
+        assert_int_equal(*(GET_DATA_PTR(pc)), no_error);
     }
 
 }
 static void CallError(void** state) {
 
     //Creating Host | Slave
-    Host linux;
+    Host pc;
     Slave stm;
-    CreateHost(&linux, addr_linux, 0x0000, hostBuffer, REQR);
+    CreateHost(&pc, addr_linux, 0x0000, hostBuffer, REQR);
     CreateSlave(&stm, slaveBuffer);
 
-    uint8_t* data = linux.CreateRequest(&linux);
+    uint8_t* data = pc.CreateRequest(&pc);
 
-    for(int i = 0; i < REQUEST_SIZE(linux); i++) {
+    for(int i = 0; i < REQUEST_SIZE(pc); i++) {
         stm.Read(&stm, *(data+i));
-        if( i != REQUEST_SIZE(linux))
+        if( i != REQUEST_SIZE(pc))
             assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_int_equal(stm.IsValid(&stm), incorrect_register_address);
@@ -145,12 +145,12 @@ static void CallError(void** state) {
 
         for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
 
-            linux.Read(&linux, *(data+i));
+            pc.Read(&pc, *(data + i));
             if( i != RESPONSE_SIZE(stm) - 1)
-                assert_int_not_equal(linux.IsValid(&linux), no_error);
+                assert_int_not_equal(pc.IsValid(&pc), no_error);
         }
-        assert_true(IS_ERROR(linux));
-        assert_int_equal(*(GET_DATA_PTR(linux)), incorrect_register_address);
+        assert_true(IS_ERROR(pc));
+        assert_int_equal(*(GET_DATA_PTR(pc)), incorrect_register_address);
 
     }
 }
@@ -168,18 +168,18 @@ static void RandomDataSOF(void** state) {
     hostBuffer[9] = 0x02;
 
 
-    Host linux;
+    Host pc;
     Slave stm;
-    CreateHost(&linux, addr_linux, 18, hostBuffer + 10, REQW);
+    CreateHost(&pc, addr_linux, 18, hostBuffer + 10, REQW);
     CreateSlave(&stm, slaveBuffer);
 
-    linux.WriteData(&linux, regData, 8);
+    pc.WriteData(&pc, regData, 8);
 
-    uint8_t* data = linux.CreateRequest(&linux)  - 10;
-    for(int i = 0; i < REQUEST_SIZE(linux); i++) {
+    uint8_t* data = pc.CreateRequest(&pc) - 10;
+    for(int i = 0; i < REQUEST_SIZE(pc); i++) {
 
         stm.Read(&stm, *(data+i));
-        if( i != REQUEST_SIZE(linux) - 1)
+        if( i != REQUEST_SIZE(pc) - 1)
             assert_int_not_equal(stm.IsValid(&stm), no_error);
     }
     assert_false(stm.IsValid(&stm) == no_error);
@@ -187,11 +187,11 @@ static void RandomDataSOF(void** state) {
     data = stm.CreateResponse(&stm);
     for(int i = 0; i < RESPONSE_SIZE(stm); i++) {
 
-        linux.Read(&linux, *(data+i));
+        pc.Read(&pc, *(data + i));
         if( i != RESPONSE_SIZE(stm) - 1)
-            assert_int_not_equal(linux.IsValid(&linux), no_error);
+            assert_int_not_equal(pc.IsValid(&pc), no_error);
     }
-    assert_true(IS_ERROR(linux));
+    assert_true(IS_ERROR(pc));
 }
 
 

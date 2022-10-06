@@ -27,9 +27,9 @@
 #include <inttypes.h>
 #endif
 
-#ifdef HAVE_SIGNAL_H
+
 #include <signal.h>
-#endif
+
 
 #ifdef HAVE_STRINGS_H
 #include <strings.h>
