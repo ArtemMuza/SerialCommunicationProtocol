@@ -81,7 +81,7 @@ static uint8_t* Serialize(Header* _header, uint8_t* _buffer, enum Error_code _er
     _buffer[2] = (_header->cmd2 + HEADER_SIZE) & 0xff;//lsb
     _buffer[3] = (_header->cmd2 + HEADER_SIZE) >> 8; //msb
 
-    uint16_t crc = Crc16(_buffer + LEN_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE);
+    uint16_t crc = Crc16(_buffer + SOF_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE);
     _buffer[_header->cmd2 + DATA_START_PLACE] = crc & 0xff;
     _buffer[_header->cmd2 + DATA_START_PLACE + 1] = crc >> 8 ;
 
