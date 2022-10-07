@@ -1,6 +1,6 @@
 # # SerialCommunicationProtocol
 ## Install & build
-
+Build Lib:
 ```bash
 git clone https://github.com/ArtemMuza/SerialCommunicationProtocol.git
 cd SerialCommunicationProtocol
@@ -10,7 +10,12 @@ make
 ```
 Library out directory:
 ```
-SerialCommunicationProtocol/build/build/src/libSCP.a
+SerialCommunicationProtocol/build/build/lib/libSCP.a
+```
+Build tests:
+```bash
+cmake .. -DTESTS=True
+make
 ```
 Tests out directory:
 ```
