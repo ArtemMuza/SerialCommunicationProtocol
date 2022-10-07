@@ -17,7 +17,12 @@ enable_testing()
 include_directories(include)
 
 add_subdirectory(cmocka)
-add_subdirectory(src build/src)
+if (TESTS)
+    add_subdirectory(src build/test)
+else()
+    add_subdirectory(src build/libs)
+endif()
+
 add_subdirectory(tests build/tests)
 
 
