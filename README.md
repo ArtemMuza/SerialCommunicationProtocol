@@ -38,7 +38,8 @@ Read Script:
 
     for(int i = 0; i < REQUEST_SIZE(pc) ; i++) 
         stm.Read(&stm, *(data+i));
-
+    if(stm.IsValid(&stm) != no_error)
+        exit(1);
     if(REQ_TYPE(stm)) { //Check read or write request was
         // get data from register addr:
         //GET_REG_ADDR(stm);
@@ -59,7 +60,8 @@ Write Script:
     uint8_t* data = pc.CreateRequest(&pc);
     for(int i = 0; i < REQUEST_SIZE(pc); i++) 
         stm.Read(&stm, *(data+i));
-
+    if(stm.IsValid(&stm) != no_error)
+        exit(1);
     if(!REQ_TYPE(stm)){
         data = stm.CreateResponse(&stm);
         for(int i = 0; i < RESPONSE_SIZE(stm); i++) 
