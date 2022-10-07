@@ -151,14 +151,8 @@ STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _b
             }
         }  break;
         case data: {
-            if(*_frameSize < (_header->cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE - 1)) {
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
-            } else {
-                _buffer[*_frameSize] = _byte;
-                (*_frameSize)++;
-                _header->mode = fcs;
-            }
         }  break;
     }
 }
@@ -212,10 +206,12 @@ STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byt
         default: {
             uint16_t  Len = _buffer[2];
             Len += _buffer[3] << 8;
-            if (*_frameSize <= ( Len + LEN_SIZE + SOF_SIZE))
+            if (*_frameSize < ( Len + LEN_SIZE + SOF_SIZE))
                 DeserializePayload(_header, _buffer, _byte, _frameSize);
-            else
+            else {
                 _header->mode = fcs;
+                DeserializeFrame(_header, _buffer, _byte, _frameSize);
+            }
         } break;
     }
 }
