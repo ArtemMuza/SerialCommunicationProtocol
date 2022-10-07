@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "SCP.h"
-#include "../src/SCP.c"
+
 #include <cmocka.h>
 
 uint8_t hostBuffer[1024];
@@ -39,10 +39,11 @@ static void CrcTest(void** state) {
 
     Host pc;
     Slave stm;
-    CreateHost(&pc, addr_linux, 18, hostBuffer, REQW);
-    CreateSlave(&stm, slaveBuffer);
+    CreateHost(&pc, hostBuffer, 1024, addr_linux, 18, REQW);
+    CreateSlave(&stm, slaveBuffer, 1024);
 
     pc.WriteData(&pc, regData, 8);
+
 
     uint8_t* data = pc.CreateRequest(&pc);
     for(int i = 0; i < REQUEST_SIZE(pc); i++) {
@@ -73,25 +74,26 @@ static void SerializeTest(void** state) {
 
     Header head = { 0 };
 
-    assert_false(Serialize(&head, NULL,no_error));
+    assert_false(Serialize(&head, NULL));
 
     head.type = REQR_CODE;
     head.cmd0 = 0x01;
     head.cmd1 = 0x05;
-    uint8_t* data = Serialize(&head, hostBuffer, no_error);
+    uint8_t* data = Serialize(&head, hostBuffer);
     assert_memory_equal(data, ReadRequestExample, 12);
 }
 static void DeserializeTest(void** state) {
     (void) state;
 
     Header  head = {0};
+    enum Error_code err;
     enum Work_mode mode = empty;
     int frameSize = 0;
 
     for(int i = 0; i < 12; i++)
-        Deserialize(&head, slaveBuffer, ReadRequestExample[i], &mode, &frameSize);
+        DeserializeFrame(&head, slaveBuffer, ReadRequestExample[i], &frameSize);
 
-    assert_int_equal(mode, finish);
+    assert_int_equal(head.mode, finish);
     assert_int_equal(frameSize, 12);
     assert_memory_equal(slaveBuffer, ReadRequestExample, 12);
 }
@@ -101,25 +103,27 @@ static void IsValidTest(void** state) {
     Header head = { 0x01, 0x01, 0x10, 0x00};
     enum Error_code err = no_error;
 
-    assert_int_equal(IsValid(&head, &err, ReadRequestExample, empty, 12), incorrect_frame_format);
+    head.mode = empty;
+    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_frame_format);
 
+    head.mode = finish;
     head.type = 0x30;
-    assert_int_equal(IsValid(&head, &err, ReadRequestExample, finish, 12), incorrect_type);
+    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_type);
 
     head.type = 0x01;
     head.cmd0 =0x00;
-    assert_int_equal(IsValid(&head, &err, ReadRequestExample, finish, 12), incorrect_mpu_address);
+    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_mpu_address);
 
     head.cmd0 = 0x01;
     head.cmd1 = 0x00;
-    assert_int_equal(IsValid(&head, &err, ReadRequestExample, finish, 12), incorrect_register_address);
+    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_register_address);
 
     head.cmd1 = 0x01;
     ReadRequestExample[11] = 0x00;
-    assert_int_equal(IsValid(&head, &err, ReadRequestExample, finish, 12), slave_data_integrity);
+    assert_int_equal(IsValid(&head, ReadRequestExample, 12), slave_data_integrity);
 
     ReadRequestExample[11] = 0xFC;
-    assert_int_equal(IsValid(&head, &err, ReadRequestExample, finish, 2), incorrect_frame_format);
+    assert_int_equal(IsValid(&head, ReadRequestExample, 2), incorrect_frame_format);
 
 
 }

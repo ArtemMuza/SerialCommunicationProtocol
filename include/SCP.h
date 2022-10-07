@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+
+
 /*      Read me | How to use
  *
  *      .Before start, you must allocate byte array buffer (max-1024)
@@ -97,16 +99,16 @@ typedef struct Header{
     uint8_t     cmd0; //MPU_ADDR
     uint16_t    cmd1; //REGISTER_ADDR
     uint16_t    cmd2; //Data_length
+
+    enum Error_code errorCode;
+    enum Work_mode  mode;
 }Header;
 
 typedef struct Host{
-
     Header header;
     uint8_t* buffer;
-    enum Error_code errorCode;
-
+    size_t   bufferSize;
     int frameSize;
-    enum Work_mode  mode;
 
     uint8_t* (*CreateRequest)(struct Host*);
     bool     (*WriteData)(struct Host*,  uint8_t*, size_t);
@@ -114,7 +116,7 @@ typedef struct Host{
     enum Error_code (*IsValid)(struct Host*);
 }Host;
 
-void        CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuffer, enum Frame_type _req);
+void        CreateHost(Host* _host, uint8_t* _dataBuffer, size_t _bufferSize, uint8_t _mpu, uint16_t _register, enum Frame_type _req);
 uint16_t    GetHostPackageSize(Host* _host);
 bool        SetRegisterAddr(Host* _host, uint16_t _addr);
 void        ChangeFrameType(Host* _host, enum Frame_type _type);
@@ -123,10 +125,8 @@ void        ChangeFrameType(Host* _host, enum Frame_type _type);
 typedef struct Slave{
     Header header;
     uint8_t* buffer;
-    enum Error_code errorCode;
-
+    size_t   bufferSize;
     int frameSize;
-    enum Work_mode  mode;
 
     uint8_t* (*CreateResponse)(struct Slave*);
     bool     (*WriteData)(struct Slave*, uint8_t*, size_t);
@@ -134,7 +134,22 @@ typedef struct Slave{
     enum Error_code (*IsValid)(struct Slave*);
 }Slave;
 
-void CreateSlave(Slave* _slave, uint8_t* _dataBuffer);
+void CreateSlave(Slave* _slave, uint8_t* _dataBuffer, size_t _bufferSize);
 uint16_t GetSlavePackageSize(Slave* _slave);
 
+#ifdef UNIT_TESTS
+#define STATIC
+STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
+STATIC bool CheckType(uint8_t _type);
+STATIC bool CheckMPU(uint8_t _mpu);
+STATIC bool CheckRegisterAddr(uint16_t _addr);
+
+STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen);
+STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer);
+STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
+STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, int _frameSize);
+STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
+#else
+#define STATIC static
+#endif
 #endif

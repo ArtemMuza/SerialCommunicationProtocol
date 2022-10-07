@@ -2,6 +2,7 @@
 #include <string.h>
 
 #define SET_1ST_BIT(x) (x |= 0x80)
+#define UNSET_1ST_BIT(x) (x &= 0x7F)
 
 static const unsigned short Crc16Table[256] = {
         0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
@@ -37,13 +38,45 @@ static const unsigned short Crc16Table[256] = {
         0x4400, 0x84C1, 0x8581, 0x4540, 0x8701, 0x47C0, 0x4680, 0x8641,
         0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
 };
+#ifndef UNIT_TESTS
+STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
+STATIC bool CheckType(uint8_t _type);
+STATIC bool CheckMPU(uint8_t _mpu);
+STATIC bool CheckRegisterAddr(uint16_t _addr);
+#endif
+STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, int _frameSize) {
 
-static uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
-static bool CheckType(uint8_t _type);
-static bool CheckMPU(uint8_t _mpu);
-static bool CheckRegisterAddr(uint16_t _addr);
+    _header->errorCode = no_error;
+    if(!_buffer)
+        return incorrect_data_length;
 
-static bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen) {
+    if(!CheckType(_header->type))
+        _header->errorCode = incorrect_type;
+
+    if(!CheckMPU(_header->cmd0))
+        _header->errorCode = incorrect_mpu_address;
+
+    if(!CheckRegisterAddr(_header->cmd1))
+        _header->errorCode = incorrect_register_address;
+
+    uint16_t crc = _buffer[_header->cmd2 + DATA_START_PLACE];
+    crc += _buffer[_header->cmd2 + 1 + DATA_START_PLACE] << 8;
+
+    if (crc != Crc16(_buffer + SOF_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE))
+        _header->errorCode = slave_data_integrity;
+    if(_header->mode != finish)
+        _header->errorCode = incorrect_frame_format;
+
+    if(_header->errorCode != no_error)
+        SET_1ST_BIT(_header->type);
+    else
+        UNSET_1ST_BIT(_header->type);
+    if(_frameSize < 12 || _frameSize < (_header->cmd2 + 6))
+        return incorrect_frame_format;
+
+    return _header->errorCode;
+}
+STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen) {
     if(_dataLen > (MAX_PROTOCOL_LEN - HEADER_SIZE) || !_data || !_buffer)
         return false;
 
@@ -52,7 +85,7 @@ static bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t 
     _header->cmd2 = _dataLen;
     return true;
 }
-static uint8_t* Serialize(Header* _header, uint8_t* _buffer, enum Error_code _errCode) {
+STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer) {
     if(!_buffer)
         return NULL;
 
@@ -67,7 +100,7 @@ static uint8_t* Serialize(Header* _header, uint8_t* _buffer, enum Error_code _er
     _buffer[6] = _header->cmd1 & 0xff;
     _buffer[7] = _header->cmd1 >> 8;
 
-    if(_errCode == no_error) {
+    if(_header->errorCode == no_error) {
 
         _buffer[8] = _header->cmd2 & 0xff;
         _buffer[9] = _header->cmd2 >> 8;
@@ -76,7 +109,7 @@ static uint8_t* Serialize(Header* _header, uint8_t* _buffer, enum Error_code _er
         _header->cmd2 = 1;
         _buffer[8] = 0x01;
         _buffer[9] = 0x00;
-        _buffer[10] = _errCode;
+        _buffer[10] = _header->errorCode;
     }
     _buffer[2] = (_header->cmd2 + HEADER_SIZE) & 0xff;//lsb
     _buffer[3] = (_header->cmd2 + HEADER_SIZE) >> 8; //msb
@@ -87,35 +120,8 @@ static uint8_t* Serialize(Header* _header, uint8_t* _buffer, enum Error_code _er
 
     return _buffer;
 }
-static void     Deserialize(Header* _header, uint8_t* _buffer, uint8_t _byte, enum Work_mode* _mode, int* _frameSize) {
-    switch (*_mode) {
-        case empty: {
-            if(_byte == (SOF & 0xff)) {
-                *_mode = sof;
-                *_frameSize = 1;
-                _buffer[0] = _byte;
-            }
-        }  break;
-        case sof: {
-            if(_byte == (SOF >> 8)) {
-                *_mode = len;
-                _buffer[*_frameSize] = _byte;
-                (*_frameSize)++;
-            } else {
-                *_mode = empty;
-                *_frameSize = 0;
-            }
-        }  break;
-        case len: {
-            if(*_frameSize == SOF_SIZE) {
-                _buffer[*_frameSize] = _byte;
-                (*_frameSize)++;
-            } else {
-                _buffer[*_frameSize] = _byte;
-                (*_frameSize)++;
-                *_mode = header;
-            }
-        }  break;
+STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize) {
+    switch (_header->mode) {
         case header: {
             switch (*_frameSize) {
                 case SOF_SIZE + LEN_SIZE://type
@@ -135,7 +141,7 @@ static void     Deserialize(Header* _header, uint8_t* _buffer, uint8_t _byte, en
                     _header->cmd2 += _byte << 8;
                     _buffer[*_frameSize] = _byte;
                     (*_frameSize)++;
-                    *_mode = data;
+                    _header->mode = data;
                     break;
             }
         }  break;
@@ -146,7 +152,40 @@ static void     Deserialize(Header* _header, uint8_t* _buffer, uint8_t _byte, en
             } else {
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
-                *_mode = fcs;
+                _header->mode = fcs;
+            }
+        }  break;
+    }
+}
+STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize) {
+    switch (_header->mode) {
+        case empty: {
+            _header->errorCode = no_error;
+            if(_byte == (SOF & 0xff)) {
+                _header->mode = sof;
+                *_frameSize = 1;
+                _buffer[0] = _byte;
+            }
+        }  break;
+        case sof: {
+            _header->errorCode = incorrect_frame_format;
+            if(_byte == (SOF >> 8)) {
+                _header->mode = len;
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+            } else {
+                _header->mode = empty;
+                *_frameSize = 0;
+            }
+        }  break;
+        case len: {
+            if(*_frameSize == SOF_SIZE) {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+            } else {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+                _header->mode = header;
             }
         }  break;
         case fcs: {
@@ -156,43 +195,27 @@ static void     Deserialize(Header* _header, uint8_t* _buffer, uint8_t _byte, en
             } else {
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
-                *_mode = finish;
+                _header->mode = finish;
+                _header->errorCode = IsValid(_header, _buffer, *_frameSize);
             }
         }  break;
         case finish: {
 
-            *_mode = empty;
-            Deserialize(_header, _buffer, _byte, _mode, _frameSize);
+            _header->mode = empty;
+            DeserializeFrame(_header, _buffer, _byte,  _frameSize);
+        } break;
+        default: {
+            uint16_t  Len = _buffer[2];
+            Len += _buffer[3] << 8;
+            if (*_frameSize <= ( Len + LEN_SIZE + SOF_SIZE))
+                DeserializePayload(_header, _buffer, _byte, _frameSize);
+            else
+                _header->mode = fcs;
         } break;
     }
 }
-static enum Error_code     IsValid(Header* _header, enum Error_code* _err, uint8_t* _buffer, enum Work_mode _mode, int _frameSize) {
-    if(_mode != finish)
-        return incorrect_frame_format;
 
-    if(!CheckType(_header->type))
-        *_err = incorrect_type;
 
-    if(!CheckMPU(_header->cmd0))
-        *_err = incorrect_mpu_address;
-
-    if(!CheckRegisterAddr(_header->cmd1))
-        *_err = incorrect_register_address;
-
-    uint16_t crc = _buffer[_header->cmd2 + DATA_START_PLACE];
-    crc += _buffer[_header->cmd2 + 1 + DATA_START_PLACE] << 8;
-
-    if (crc != Crc16(_buffer + SOF_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE))
-        *_err = slave_data_integrity;
-
-    if(*_err != no_error)
-        SET_1ST_BIT(_header->type);
-    if(_frameSize < 12 || _frameSize < (_header->cmd2 + 6))
-        return incorrect_frame_format;
-
-    return *_err;
-
-}
 
 //HOST
 static uint8_t* CreateRequest(Host* _host);
@@ -200,7 +223,7 @@ static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen);
 static enum Error_code IsHostValid(Host* _host);
 static void ReadHost(Host* _host, uint8_t _byte);
 
-void CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuffer, enum Frame_type _req) {
+void CreateHost(Host* _host, uint8_t* _dataBuffer, size_t _bufferSize, uint8_t _mpu, uint16_t _register, enum Frame_type _req) {
     //Add buffer  length handler
 
     ChangeFrameType(_host, _req);
@@ -208,29 +231,35 @@ void CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuf
     _host->header.cmd0 = _mpu;
     _host->header.cmd1 = _register;
     _host->header.cmd2 = 0;
-    _host->errorCode   = no_error;
-    _host->mode = empty;
+    _host->header.errorCode   = no_error;
+    _host->header.mode = empty;
+    _host->bufferSize = _bufferSize;
+    _host->frameSize = 0;
 
     _host->WriteData = &WriteHostData;
     _host->CreateRequest = &CreateRequest;
     _host->Read = &ReadHost;
     _host->IsValid = &IsHostValid;
-    if(_dataBuffer)
+    if(_dataBuffer && (_bufferSize > 6 && _bufferSize < MAX_PROTOCOL_LEN + 1))
         _host->buffer = _dataBuffer;
     else {
         _host->buffer = NULL;
-        _host->errorCode = incorrect_data_value;
+        _host->header.errorCode = incorrect_data_length;
     }
 }
 static void ReadHost(Host* _host, uint8_t _byte){
-    Deserialize(&_host->header, _host->buffer, _byte, &_host->mode, &_host->frameSize);
+    if(_host->frameSize >= _host->bufferSize){
+        _host->header.errorCode = incorrect_data_length;
+        return;
+    }
+    DeserializeFrame(&_host->header, _host->buffer, _byte, &_host->frameSize);
 }
 static enum Error_code IsHostValid(Host* _host) {
 
-    if (_host->header.type == REQR_CODE && _host->header.cmd2 == 0 && _host->mode == finish)
-        _host->errorCode = incorrect_data_length;
+    if (_host->header.type == REQR_CODE && _host->header.cmd2 == 0 && _host->header.mode == finish)
+        _host->header.errorCode = incorrect_data_length;
 
-    return IsValid(&_host->header, &_host->errorCode, _host->buffer, _host->mode, _host->frameSize);
+    return IsValid(&_host->header, _host->buffer, _host->frameSize);
 }
 static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen) {
     return WriteData(&_host->header, _host->buffer, _data, _dataLen);
@@ -247,7 +276,7 @@ static uint8_t* CreateRequest(Host* _host) {
         _host->WriteData(_host, _host->buffer, 0);
     }
 
-    return Serialize(&_host->header, _host->buffer, _host->errorCode);
+    return Serialize(&_host->header, _host->buffer);
 }
 
 bool SetRegisterAddr(Host* _host, uint16_t _addr) {
@@ -271,54 +300,59 @@ static uint8_t* CreateResponse(Slave*);
 static void ReadSlave(Slave* _slave, uint8_t _byte);
 static enum Error_code IsSlaveValid(Slave* _slave);
 
-void CreateSlave(Slave* _slave, uint8_t* _dataBuffer) {
+void CreateSlave(Slave* _slave, uint8_t* _dataBuffer, size_t _bufferSize) {
 
     _slave->header.cmd2 = 0;
-    _slave->errorCode   = no_error;
+    _slave->header.errorCode   = no_error;
     _slave->frameSize   = 0;
-    _slave->mode = empty;
+    _slave->header.mode = empty;
+    _slave->bufferSize = _bufferSize;
+    _slave->frameSize = 0;
 
     _slave->WriteData = &WriteSlaveData;
     _slave->CreateResponse = &CreateResponse;
     _slave->Read = &ReadSlave;
     _slave->IsValid = &IsSlaveValid;
-    if(_dataBuffer)
+    if(_dataBuffer && (_bufferSize > 6 && _bufferSize < MAX_PROTOCOL_LEN + 1))
         _slave->buffer = _dataBuffer;
     else {
         _slave->buffer = NULL;
-        _slave->errorCode = incorrect_data_value;
+        _slave->header.errorCode = incorrect_data_value;
     }
 }
 static void ReadSlave(Slave* _slave, uint8_t _byte) {
-
-    Deserialize(&_slave->header, _slave->buffer, _byte, &_slave->mode, &_slave->frameSize);
+    if(_slave->frameSize >= _slave->bufferSize){
+        _slave->header.errorCode = incorrect_data_length;
+        return;
+    }
+    DeserializeFrame(&_slave->header, _slave->buffer, _byte, &_slave->frameSize);
 }
 static enum Error_code IsSlaveValid(Slave* _slave) {
 
-    if (_slave->header.type == REQR_CODE && _slave->header.cmd2 != 0 && _slave->mode == finish)
-        _slave->errorCode = incorrect_data_length;
+    if (_slave->header.type == REQR_CODE && _slave->header.cmd2 != 0 && _slave->header.mode == finish)
+        _slave->header.errorCode = incorrect_data_length;
 
-    return IsValid(&_slave->header, &_slave->errorCode, _slave->buffer, _slave->mode, _slave->frameSize);
+    return IsValid(&_slave->header,  _slave->buffer, _slave->frameSize);
 }
 static bool WriteSlaveData(Slave* _slave,  uint8_t* _data, size_t _dataLen) {
     return WriteData(&_slave->header, _slave->buffer, _data, _dataLen);
 }
 uint16_t GetSlavePackageSize(Slave* _slave) {
 
-    if(_slave->header.type & REQW_CODE || _slave->errorCode != no_error)
+    if(_slave->header.type & REQW_CODE || _slave->header.errorCode != no_error)
         return HEADER_SIZE + 1;
     return HEADER_SIZE + _slave->header.cmd2;
 }
 static uint8_t* CreateResponse(Slave* _slave) {
 
     if(_slave->header.type & REQW_CODE) {
-        uint8_t err = _slave->errorCode;
+        uint8_t err = _slave->header.errorCode;
         _slave->WriteData(_slave, &err, 1);
     }
-    return Serialize(&_slave->header, _slave->buffer, _slave->errorCode);
+    return Serialize(&_slave->header, _slave->buffer);
 }
 
-static uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)
+STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)
 {
     uint16_t crc = 0xFFFF;
 
@@ -328,15 +362,15 @@ static uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)
     return crc;
 }
 
-static bool CheckType(uint8_t _type) {
+STATIC bool CheckType(uint8_t _type) {
     return !(_type & 0x70);
 }
-static bool CheckMPU(uint8_t _mpu) {
+STATIC bool CheckMPU(uint8_t _mpu) {
     if(_mpu == 0x00 || _mpu == 0xFF)
         return false;
     return true;
 }
-static bool CheckRegisterAddr(uint16_t _addr){
+STATIC bool CheckRegisterAddr(uint16_t _addr){
     if(_addr == 0x0000 || _addr == 0xFFFF)
         return false;
     return true;
