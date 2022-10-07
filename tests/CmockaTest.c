@@ -218,6 +218,7 @@ int main(int argc, char** argv) {
             unit_test(RandomDataFirst),
             unit_test(CallError),
             unit_test(RandomDataSOF),
+            unit_test(SetterTest),
             };
 
 
