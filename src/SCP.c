@@ -44,10 +44,10 @@ STATIC bool CheckType(uint8_t _type);
 STATIC bool CheckMPU(uint8_t _mpu);
 STATIC bool CheckRegisterAddr(uint16_t _addr);
 #endif
-STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, int _frameSize) {
+STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bufferSize, int _frameSize) {
 
     _header->errorCode = no_error;
-    if(!_buffer)
+    if(!_buffer || _bufferSize < 6)
         return incorrect_data_length;
 
     if(!CheckType(_header->type))
@@ -62,7 +62,12 @@ STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, int _frame
     uint16_t crc = _buffer[_header->cmd2 + DATA_START_PLACE];
     crc += _buffer[_header->cmd2 + 1 + DATA_START_PLACE] << 8;
 
-    if (crc != Crc16(_buffer + SOF_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE))
+    uint16_t Len = _buffer[2];
+    Len += _buffer[3] << 8;
+    if( _bufferSize < Len)
+        return incorrect_data_length;
+
+    if (crc != Crc16(_buffer + SOF_SIZE, Len + LEN_SIZE))
         _header->errorCode = slave_data_integrity;
     if(_header->mode != finish)
         _header->errorCode = incorrect_frame_format;
@@ -196,7 +201,7 @@ STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byt
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
                 _header->mode = finish;
-                _header->errorCode = IsValid(_header, _buffer, *_frameSize);
+                _header->errorCode = IsValid(_header, _buffer, *_frameSize, *_frameSize);
             }
         }  break;
         case finish: {
@@ -259,7 +264,7 @@ static enum Error_code IsHostValid(Host* _host) {
     if (_host->header.type == REQR_CODE && _host->header.cmd2 == 0 && _host->header.mode == finish)
         _host->header.errorCode = incorrect_data_length;
 
-    return IsValid(&_host->header, _host->buffer, _host->frameSize);
+    return IsValid(&_host->header, _host->buffer, _host->bufferSize, _host->frameSize);
 }
 static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen) {
     return WriteData(&_host->header, _host->buffer, _data, _dataLen);
@@ -332,7 +337,7 @@ static enum Error_code IsSlaveValid(Slave* _slave) {
     if (_slave->header.type == REQR_CODE && _slave->header.cmd2 != 0 && _slave->header.mode == finish)
         _slave->header.errorCode = incorrect_data_length;
 
-    return IsValid(&_slave->header,  _slave->buffer, _slave->frameSize);
+    return IsValid(&_slave->header,  _slave->buffer, _slave->bufferSize, _slave->frameSize);
 }
 static bool WriteSlaveData(Slave* _slave,  uint8_t* _data, size_t _dataLen) {
     return WriteData(&_slave->header, _slave->buffer, _data, _dataLen);

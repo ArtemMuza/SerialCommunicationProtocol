@@ -137,6 +137,7 @@ typedef struct Slave{
 void CreateSlave(Slave* _slave, uint8_t* _dataBuffer, size_t _bufferSize);
 uint16_t GetSlavePackageSize(Slave* _slave);
 
+
 #ifdef UNIT_TESTS
 #define STATIC
 STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
@@ -147,7 +148,7 @@ STATIC bool CheckRegisterAddr(uint16_t _addr);
 STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen);
 STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer);
 STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
-STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, int _frameSize);
+STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bufferSize, int _frameSize);
 STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
 #else
 #define STATIC static

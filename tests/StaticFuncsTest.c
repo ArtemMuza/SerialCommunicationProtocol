@@ -86,8 +86,6 @@ static void DeserializeTest(void** state) {
     (void) state;
 
     Header  head = {0};
-    enum Error_code err;
-    enum Work_mode mode = empty;
     int frameSize = 0;
 
     for(int i = 0; i < 12; i++)
@@ -104,28 +102,26 @@ static void IsValidTest(void** state) {
     enum Error_code err = no_error;
 
     head.mode = empty;
-    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_frame_format);
+    assert_int_equal(IsValid(&head, ReadRequestExample,100, 12), incorrect_frame_format);
 
     head.mode = finish;
     head.type = 0x30;
-    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_type);
+    assert_int_equal(IsValid(&head, ReadRequestExample,100, 12), incorrect_type);
 
     head.type = 0x01;
     head.cmd0 =0x00;
-    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_mpu_address);
+    assert_int_equal(IsValid(&head, ReadRequestExample,100, 12), incorrect_mpu_address);
 
     head.cmd0 = 0x01;
     head.cmd1 = 0x00;
-    assert_int_equal(IsValid(&head, ReadRequestExample, 12), incorrect_register_address);
+    assert_int_equal(IsValid(&head, ReadRequestExample,100, 12), incorrect_register_address);
 
     head.cmd1 = 0x01;
     ReadRequestExample[11] = 0x00;
-    assert_int_equal(IsValid(&head, ReadRequestExample, 12), slave_data_integrity);
+    assert_int_equal(IsValid(&head, ReadRequestExample,100, 12), slave_data_integrity);
 
     ReadRequestExample[11] = 0xFC;
-    assert_int_equal(IsValid(&head, ReadRequestExample, 2), incorrect_frame_format);
-
-
+    assert_int_equal(IsValid(&head, ReadRequestExample,100, 2), incorrect_frame_format);
 }
 
 
