@@ -2,10 +2,6 @@
 #include <string.h>
 
 #define SET_1ST_BIT(x) (x |= 0x80)
-#define RESERVED_REGISTER_COUNT 2
-static const uint16_t ReservedRegistersAddr[] = {
-        0x0000, 0xFFFF
-};
 
 static const unsigned short Crc16Table[256] = {
         0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
@@ -47,6 +43,157 @@ static bool CheckType(uint8_t _type);
 static bool CheckMPU(uint8_t _mpu);
 static bool CheckRegisterAddr(uint16_t _addr);
 
+static bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen) {
+    if(_dataLen > (MAX_PROTOCOL_LEN - HEADER_SIZE) || !_data || !_buffer)
+        return false;
+
+    for(int i = 0; i < _dataLen; i++)
+        _buffer[i + DATA_START_PLACE] = _data[i];
+    _header->cmd2 = _dataLen;
+    return true;
+}
+static uint8_t* Serialize(Header* _header, uint8_t* _buffer, enum Error_code _errCode) {
+    if(!_buffer)
+        return NULL;
+
+    //SOF
+    _buffer[0] = SOF & 0xff;//0xAA
+    _buffer[1] = SOF >> 8;//0x55
+
+    //Payload
+    //Header
+    _buffer[4] = _header->type;
+    _buffer[5] = _header->cmd0;
+    _buffer[6] = _header->cmd1 & 0xff;
+    _buffer[7] = _header->cmd1 >> 8;
+
+    if(_errCode == no_error) {
+
+        _buffer[8] = _header->cmd2 & 0xff;
+        _buffer[9] = _header->cmd2 >> 8;
+    } else {
+        _header->type |= 0x80;
+        _header->cmd2 = 1;
+        _buffer[8] = 0x01;
+        _buffer[9] = 0x00;
+        _buffer[10] = _errCode;
+    }
+    _buffer[2] = (_header->cmd2 + HEADER_SIZE) & 0xff;//lsb
+    _buffer[3] = (_header->cmd2 + HEADER_SIZE) >> 8; //msb
+
+    uint16_t crc = Crc16(_buffer + LEN_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE);
+    _buffer[_header->cmd2 + DATA_START_PLACE] = crc & 0xff;
+    _buffer[_header->cmd2 + DATA_START_PLACE + 1] = crc >> 8 ;
+
+    return _buffer;
+}
+static void     Deserialize(Header* _header, uint8_t* _buffer, uint8_t _byte, enum Work_mode* _mode, int* _frameSize) {
+    switch (*_mode) {
+        case empty: {
+            if(_byte == (SOF & 0xff)) {
+                *_mode = sof;
+                *_frameSize = 1;
+                _buffer[0] = _byte;
+            }
+        }  break;
+        case sof: {
+            if(_byte == (SOF >> 8)) {
+                *_mode = len;
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+            } else {
+                *_mode = empty;
+                *_frameSize = 0;
+            }
+        }  break;
+        case len: {
+            if(*_frameSize == SOF_SIZE) {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+            } else {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+                *_mode = header;
+            }
+        }  break;
+        case header: {
+            switch (*_frameSize) {
+                case SOF_SIZE + LEN_SIZE://type
+                    _header->type = _byte;
+                case SOF_SIZE + LEN_SIZE + 1://cmd0
+                    _header->cmd0 = _byte;
+                case SOF_SIZE + LEN_SIZE + 2://cmd1(1)
+                    _header->cmd1 = _byte;
+                case SOF_SIZE + LEN_SIZE + 3://cmd1(2)
+                    _header->cmd1 += _byte << 8;
+                case SOF_SIZE + LEN_SIZE + 4://cmd2(1)
+                    _header->cmd2 = _byte;
+                    _buffer[*_frameSize] = _byte;
+                    (*_frameSize)++;
+                    break;
+                default://cmd2(2)
+                    _header->cmd2 += _byte << 8;
+                    _buffer[*_frameSize] = _byte;
+                    (*_frameSize)++;
+                    *_mode = data;
+                    break;
+            }
+        }  break;
+        case data: {
+            if(*_frameSize < (_header->cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE - 1)) {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+            } else {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+                *_mode = fcs;
+            }
+        }  break;
+        case fcs: {
+            if(*_frameSize < (_header->cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+            } else {
+                _buffer[*_frameSize] = _byte;
+                (*_frameSize)++;
+                *_mode = finish;
+            }
+        }  break;
+        case finish: {
+
+            *_mode = empty;
+            Deserialize(_header, _buffer, _byte, _mode, _frameSize);
+        } break;
+    }
+}
+static enum Error_code     IsValid(Header* _header, enum Error_code* _err, uint8_t* _buffer, enum Work_mode _mode, int _frameSize) {
+    if(_mode != finish)
+        return incorrect_frame_format;
+
+    if(!CheckType(_header->type))
+        *_err = incorrect_type;
+
+    if(!CheckMPU(_header->cmd0))
+        *_err = incorrect_mpu_address;
+
+    if(!CheckRegisterAddr(_header->cmd1))
+        *_err = incorrect_register_address;
+
+    uint16_t crc = _buffer[_header->cmd2 + DATA_START_PLACE];
+    crc += _buffer[_header->cmd2 + 1 + DATA_START_PLACE] << 8;
+
+    if (crc != Crc16(_buffer + SOF_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE))
+        *_err = slave_data_integrity;
+
+    if(*_err != no_error)
+        SET_1ST_BIT(_header->type);
+    if(_frameSize < 12 || _frameSize < (_header->cmd2 + 6))
+        return incorrect_frame_format;
+
+    return *_err;
+
+}
+
 //HOST
 static uint8_t* CreateRequest(Host* _host);
 static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen);
@@ -76,175 +223,40 @@ void CreateHost(Host* _host, uint8_t _mpu, uint16_t _register, uint8_t* _dataBuf
     }
 }
 static void ReadHost(Host* _host, uint8_t _byte){
-
-    switch (_host->mode) {
-        case empty: {
-            if(_byte == (SOF & 0xff)) {
-                _host->mode = sof;
-                _host->frameSize = 1;
-                _host->buffer[0] = _byte;
-            }
-        }  break;
-        case sof: {
-            if(_byte == (SOF >> 8)) {
-                _host->mode = len;
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-            } else {
-                _host->mode = empty;
-                _host->frameSize = 0;
-            }
-        }  break;
-        case len: {
-            if(_host->frameSize == SOF_SIZE) {
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-            } else {
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-                _host->mode = header;
-            }
-        }  break;
-        case header: {
-            switch (_host->frameSize) {
-                case SOF_SIZE + LEN_SIZE://type
-                    _host->header.type = _byte;
-                case SOF_SIZE + LEN_SIZE + 1://cmd0
-                    _host->header.cmd0 = _byte;
-                case SOF_SIZE + LEN_SIZE + 2://cmd1(1)
-                    _host->header.cmd1 = _byte;
-                case SOF_SIZE + LEN_SIZE + 3://cmd1(2)
-                    _host->header.cmd1 += _byte << 8;
-                case SOF_SIZE + LEN_SIZE + 4://cmd2(1)
-                    _host->header.cmd2 = _byte;
-                    _host->buffer[_host->frameSize] = _byte;
-                    _host->frameSize++;
-                    break;
-                default://cmd2(2)
-                    _host->header.cmd2 += _byte << 8;
-                    _host->buffer[_host->frameSize] = _byte;
-                    _host->frameSize++;
-                    _host->mode = data;
-                    break;
-            }
-        }  break;
-        case data: {
-            if(_host->frameSize < (_host->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE - 1)) {
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-            } else {
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-                _host->mode = fcs;
-            }
-        }  break;
-        case fcs: {
-            if(_host->frameSize < (_host->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-            } else {
-                _host->buffer[_host->frameSize] = _byte;
-                _host->frameSize++;
-                _host->mode = finish;
-            }
-        }  break;
-        case finish: {
-            _host->mode = empty;
-            _host->Read(_host, _byte);
-        } break;
-    }
+    Deserialize(&_host->header, _host->buffer, _byte, &_host->mode, &_host->frameSize);
 }
 static enum Error_code IsHostValid(Host* _host) {
-    if(_host->mode != finish)
-        return incorrect_frame_format;
 
-    if(!CheckType(_host->header.type))
-        _host->errorCode = incorrect_type;
-
-    if(!CheckMPU(_host->header.cmd0))
-        _host->errorCode = incorrect_mpu_address;
-
-    if(!CheckRegisterAddr(_host->header.cmd1))
-        _host->errorCode = incorrect_register_address;
-
-    if (_host->header.type == REQR_CODE && _host->header.cmd2 == 0)
+    if (_host->header.type == REQR_CODE && _host->header.cmd2 == 0 && _host->mode == finish)
         _host->errorCode = incorrect_data_length;
 
-    uint16_t crc = _host->buffer[_host->header.cmd2 + DATA_START_PLACE];
-    crc += _host->buffer[_host->header.cmd2 + 1 + DATA_START_PLACE] << 8;
-
-    if (crc != Crc16(_host->buffer + SOF_SIZE, _host->header.cmd2 + HEADER_SIZE + LEN_SIZE))
-        _host->errorCode = slave_data_integrity;
-
-    if(_host->frameSize < 12, _host->frameSize < GetHostPackageSize(_host))
-        return incorrect_frame_format;
-
-    return _host->errorCode;
+    return IsValid(&_host->header, &_host->errorCode, _host->buffer, _host->mode, _host->frameSize);
 }
 static bool WriteHostData(Host* _host,  uint8_t* _data, size_t _dataLen) {
-
-    if(_dataLen > (MAX_PROTOCOL_LEN - HEADER_SIZE) || !_data || !_host->buffer)
-        return false;
-
-    for(int i = 0; i < _dataLen; i++)
-        _host->buffer[i + DATA_START_PLACE] = _data[i];
-    _host->header.cmd2 = _dataLen;
-    return true;
+    return WriteData(&_host->header, _host->buffer, _data, _dataLen);
 }
 uint16_t GetHostPackageSize(Host* _host) {
-    uint16_t size =  HEADER_SIZE;
-    size += _host->header.cmd2;
 
     if(_host->header.type & REQR_CODE)
         return HEADER_SIZE;
-    return size;
+    return HEADER_SIZE + _host->header.cmd2;
 }
 static uint8_t* CreateRequest(Host* _host) {
-    if(!_host->buffer)
-        return NULL;
 
-    //SOF
-    _host->buffer[0] = SOF & 0xff;//0xAA
-    _host->buffer[1] = SOF >> 8;//0x55
-
-    //Payload
-    //Header
-    _host->buffer[4] = _host->header.type;
-    _host->buffer[5] = _host->header.cmd0;
-    _host->buffer[6] = _host->header.cmd1 & 0xff;
-    _host->buffer[7] = _host->header.cmd1 >> 8;
-
-    if(_host->errorCode == no_error) {
-
-        _host->buffer[8] = _host->header.cmd2 & 0xff;
-        _host->buffer[9] = _host->header.cmd2 >> 8;
-
-    } else {
-        _host->header.type |= 0x80;
-        _host->header.cmd2 = 1;
-        _host->buffer[8] = 0x01;
-        _host->buffer[9] = 0x00;
-        _host->buffer[10] = _host->errorCode;
+    if(_host->header.type & REQR_CODE) {
+        _host->WriteData(_host, _host->buffer, 0);
     }
-    _host->buffer[2] = GetHostPackageSize(_host) & 0xff;//lsb
-    _host->buffer[3] = GetHostPackageSize(_host) >> 8; //msb
 
-    uint16_t crc = Crc16(_host->buffer + LEN_SIZE, _host->header.cmd2 + HEADER_SIZE + LEN_SIZE);
-    _host->buffer[_host->header.cmd2 + DATA_START_PLACE] = crc & 0xff;
-    _host->buffer[_host->header.cmd2 + DATA_START_PLACE + 1] = crc >> 8 ;
-
-
-    return _host->buffer;
+    return Serialize(&_host->header, _host->buffer, _host->errorCode);
 }
 
 bool SetRegisterAddr(Host* _host, uint16_t _addr) {
-    for(int i = 0; i < RESERVED_REGISTER_COUNT; i++) {
-        if (_addr == ReservedRegistersAddr[i])
-            return false;
+    if(CheckRegisterAddr(_addr))
+    {
+        _host->header.cmd1 = _addr;
+        return true;
     }
-
-    _host->header.cmd1 = _addr;
-    return true;
+    return false;
 }
 void ChangeFrameType(Host* _host, enum Frame_type _type){
     if(_type == REQR)
@@ -279,176 +291,31 @@ void CreateSlave(Slave* _slave, uint8_t* _dataBuffer) {
 }
 static void ReadSlave(Slave* _slave, uint8_t _byte) {
 
-    switch (_slave->mode) {
-        case empty: {
-            if(_byte == (SOF & 0xff)) {
-                _slave->mode = sof;
-                _slave->frameSize = 1;
-                _slave->buffer[0] = _byte;
-            }
-        }  break;
-        case sof: {
-            if(_byte == (SOF >> 8)) {
-                _slave->mode = len;
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-            } else {
-                _slave->mode = empty;
-                _slave->frameSize = 0;
-            }
-        }  break;
-        case len: {
-            if(_slave->frameSize == SOF_SIZE) {
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-            } else {
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-                _slave->mode = header;
-            }
-        }  break;
-        case header: {
-            switch (_slave->frameSize) {
-                case SOF_SIZE + LEN_SIZE://type
-                    _slave->header.type = _byte;
-                case SOF_SIZE + LEN_SIZE + 1://cmd0
-                    _slave->header.cmd0 = _byte;
-                case SOF_SIZE + LEN_SIZE + 2://cmd1(1)
-                    _slave->header.cmd1 = _byte;
-                case SOF_SIZE + LEN_SIZE + 3://cmd1(2)
-                    _slave->header.cmd1 += _byte << 8;
-                case SOF_SIZE + LEN_SIZE + 4://cmd2(1)
-                    _slave->header.cmd2 = _byte;
-                    _slave->buffer[_slave->frameSize] = _byte;
-                    _slave->frameSize++;
-                    break;
-                default://cmd2(2)
-                    _slave->header.cmd2 += _byte << 8;
-                    _slave->buffer[_slave->frameSize] = _byte;
-                    _slave->frameSize++;
-                    _slave->mode = data;
-                    break;
-            }
-        }  break;
-        case data: {
-            if(_slave->frameSize < (_slave->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE - 1)) {
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-            } else {
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-                _slave->mode = fcs;
-            }
-        }  break;
-        case fcs: {
-            if(_slave->frameSize < (_slave->header.cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-            } else {
-                _slave->buffer[_slave->frameSize] = _byte;
-                _slave->frameSize++;
-                _slave->mode = finish;
-            }
-        }  break;
-        case finish: {
-            _slave->mode = empty;
-            _slave->Read(_slave, _byte);
-        } break;
-    }
+    Deserialize(&_slave->header, _slave->buffer, _byte, &_slave->mode, &_slave->frameSize);
 }
 static enum Error_code IsSlaveValid(Slave* _slave) {
 
-    if(_slave->mode != finish)
-        return incorrect_frame_format;
-
-    if(!CheckType(_slave->header.type))
-        _slave->errorCode = incorrect_type;
-
-    if(!CheckMPU(_slave->header.cmd0))
-        _slave->errorCode = incorrect_mpu_address;
-
-    if(!CheckRegisterAddr(_slave->header.cmd1))
-        _slave->errorCode = incorrect_register_address;
-
-    if (_slave->header.type == REQR_CODE && _slave->header.cmd2 != 0)
+    if (_slave->header.type == REQR_CODE && _slave->header.cmd2 != 0 && _slave->mode == finish)
         _slave->errorCode = incorrect_data_length;
 
-    uint16_t crc = _slave->buffer[_slave->header.cmd2 + DATA_START_PLACE];
-    crc += _slave->buffer[_slave->header.cmd2 + 1 + DATA_START_PLACE] << 8;
-
-    if (crc != Crc16(_slave->buffer + LEN_SIZE, _slave->header.cmd2 + HEADER_SIZE + LEN_SIZE))
-        _slave->errorCode = slave_data_integrity;
-
-    if(_slave->frameSize < 12 || _slave->frameSize < GetSlavePackageSize(_slave))
-        return incorrect_frame_format;
-
-    return _slave->errorCode;
+    return IsValid(&_slave->header, &_slave->errorCode, _slave->buffer, _slave->mode, _slave->frameSize);
 }
 static bool WriteSlaveData(Slave* _slave,  uint8_t* _data, size_t _dataLen) {
-
-    if(_dataLen > MAX_PROTOCOL_LEN - HEADER_SIZE || !_data || !_slave->buffer)
-        return false;
-
-    for(int i = 0; i < _dataLen; i++)
-        _slave->buffer[i + DATA_START_PLACE] = _data[i];
-    _slave->header.cmd2 = _dataLen;
-    return true;
+    return WriteData(&_slave->header, _slave->buffer, _data, _dataLen);
 }
 uint16_t GetSlavePackageSize(Slave* _slave) {
-    uint16_t size =  HEADER_SIZE;
-    size += _slave->header.cmd2;
+
     if(_slave->header.type & REQW_CODE || _slave->errorCode != no_error)
         return HEADER_SIZE + 1;
-    return size;
+    return HEADER_SIZE + _slave->header.cmd2;
 }
 static uint8_t* CreateResponse(Slave* _slave) {
-    if(!_slave->buffer)
-        return NULL;
 
-    //SOF
-    _slave->buffer[0] = SOF & 0xff;//0xAA
-    _slave->buffer[1] = SOF >> 8;//0x55
-    //DATA len
-
-    //Payload
-    //Header
-    _slave->buffer[4] = _slave->header.type;
-    _slave->buffer[5] = _slave->header.cmd0;
-    _slave->buffer[6] = _slave->header.cmd1 & 0xff;
-    _slave->buffer[7] = _slave->header.cmd1 >> 8;
-
-    if(_slave->errorCode == no_error) {
-        if(_slave->header.type & REQR_CODE){
-
-            _slave->buffer[8] = _slave->header.cmd2 & 0xff;
-            _slave->buffer[9] = _slave->header.cmd2 >> 8;
-
-        } else {
-
-            _slave->header.cmd2 = 1;
-            _slave->buffer[8] = 0x01;//Size = 1 because it will contain only err code
-            _slave->buffer[9] = 0x00;
-
-            _slave->buffer[10] = _slave->errorCode;
-
-        }
-
-    } else {
-        SET_1ST_BIT(_slave->buffer[4]);
-        _slave->header.cmd2 = 1;
-        _slave->buffer[8] = 0x01;//Size = 1 because it will contain only err code
-        _slave->buffer[9] = 0x00;
-
-        _slave->buffer[10] = _slave->errorCode;
+    if(_slave->header.type & REQW_CODE) {
+        uint8_t err = _slave->errorCode;
+        _slave->WriteData(_slave, &err, 1);
     }
-    _slave->buffer[2] = GetSlavePackageSize(_slave) & 0xff;
-    _slave->buffer[3] = GetSlavePackageSize(_slave) >> 8;
-
-    uint16_t crc = Crc16(_slave->buffer + LEN_SIZE, GetSlavePackageSize(_slave) + 2);
-    _slave->buffer[_slave->header.cmd2 + DATA_START_PLACE] = crc & 0xff;
-    _slave->buffer[_slave->header.cmd2 + 1 + DATA_START_PLACE] = crc >> 8;
-
-    return _slave->buffer;
+    return Serialize(&_slave->header, _slave->buffer, _slave->errorCode);
 }
 
 static uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)

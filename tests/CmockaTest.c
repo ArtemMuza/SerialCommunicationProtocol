@@ -4,7 +4,6 @@
 #include <stdio.h>
 
 #include "SCP.h"
-#include "Tests.h"
 #include <cmocka.h>
 
 uint8_t hostBuffer[1024];
@@ -149,6 +148,7 @@ static void CallError(void** state) {
             if( i != RESPONSE_SIZE(stm) - 1)
                 assert_int_not_equal(pc.IsValid(&pc), no_error);
         }
+        assert_int_not_equal(pc.IsValid(&pc), no_error);
         assert_true(IS_ERROR(pc));
         assert_int_equal(*(GET_DATA_PTR(pc)), incorrect_register_address);
 
