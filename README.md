@@ -21,6 +21,8 @@ Tests out directory:
 ```
 SerialCommunicationProtocol/build/build/tests/
 ```
+
+ - If you use "cmake .." but it builded tests, use "cmake .. -DTESTS=False"
 ## How to use
 - Allocating buffers for Host|Slave (max_length = 1024)
 ```c++
