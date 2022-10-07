@@ -122,6 +122,7 @@ static void RandomDataFirst(void** state) {
 }
 static void CallError(void** state) {
 
+    (void) state;
     //Creating Host | Slave
     Host pc;
     Slave stm;
@@ -156,6 +157,7 @@ static void CallError(void** state) {
 }
 static void RandomDataSOF(void** state) {
 
+    (void)state;
     hostBuffer[0] = 0x23;
     hostBuffer[1] = 0x35;
     hostBuffer[2] = 0xF2;
@@ -193,7 +195,19 @@ static void RandomDataSOF(void** state) {
     }
     assert_true(IS_ERROR(pc));
 }
+static void SetterTest(void** state) {
 
+    Host pc;
+    Slave stm;
+    CreateHost(&pc, addr_linux, 18, hostBuffer, REQR);
+    CreateSlave(&stm, slaveBuffer);
+
+
+    assert_true(SetRegisterAddr(&pc, 0x20));
+    assert_int_equal(pc.header.cmd1, 0x20);
+    ChangeFrameType(&pc, REQW);
+    assert_int_equal(pc.header.type, REQW_CODE);
+}
 
 int main(int argc, char** argv) {
 
