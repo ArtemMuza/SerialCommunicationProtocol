@@ -18,7 +18,7 @@ include_directories(include)
 
 add_subdirectory(cmocka)
 if (TESTS)
-    add_subdirectory(src build/test)
+    add_subdirectory(src build/tests)
 else()
     add_subdirectory(src build/libs)
 endif()
