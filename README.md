@@ -47,7 +47,7 @@ Read Script:
         data = stm.CreateResponse(&stm);
         for(int i = 0; i < RESPONSE_SIZE(stm) ; i++) 
             pc.Read(&pc, *(data + i));
-        
+        if(pc.IsValid(&pc) == no_error) {}
         //Now we get data in  GET_DATA_PTR(linux)
         //And them lenght in  GET_DATA_LEN(linux)
     }
@@ -64,7 +64,7 @@ Write Script:
         data = stm.CreateResponse(&stm);
         for(int i = 0; i < RESPONSE_SIZE(stm); i++) 
             pc.Read(&pc, *(data + i));
-        
+        switch(pc.IsValid(&pc) {}
         //Now we have error code in pc data, no_error if all is ok
     }
 ```
