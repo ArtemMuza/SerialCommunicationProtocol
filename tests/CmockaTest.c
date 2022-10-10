@@ -282,7 +282,7 @@ void EmptyPayload(void** state) {
     for (int i = 0; i < 6; ++i)
         stm.Read(&stm, EmptyRequest[i]);
 
-    assert_int_equal(stm.IsValid(&stm), incorrect_frame_format);
+    assert_int_equal(stm.IsValid(&stm), no_error);
 }
 void NULL_Buffer(void** state) {
     (void)state;
@@ -314,6 +314,7 @@ int main(int argc, char** argv) {
 
     const struct UnitTest tests [] =
             {
+                    unit_test(EmptyPayload),
             unit_test (ReadTest),
             unit_test (WriteTest),
             unit_test(RandomDataFirst),
@@ -321,7 +322,7 @@ int main(int argc, char** argv) {
             unit_test(RandomDataSOF),
             unit_test(SetterTest),
             unit_test(ShorterBufferTest),
-            unit_test(EmptyPayload),
+
             unit_test(NULL_Buffer),
             };
 

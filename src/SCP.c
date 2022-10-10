@@ -59,8 +59,8 @@ STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bu
     if(!CheckRegisterAddr(_header->cmd1))
         _header->errorCode = incorrect_register_address;
 
-    uint16_t crc = _buffer[_header->cmd2 + DATA_START_PLACE];
-    crc += _buffer[_header->cmd2 + 1 + DATA_START_PLACE] << 8;
+    uint16_t crc = _buffer[_header->len + SOF_SIZE + LEN_SIZE];
+    crc += _buffer[_header->len + 1 + SOF_SIZE + LEN_SIZE] << 8;
 
 
     if( _bufferSize < _header->len)
@@ -72,11 +72,13 @@ STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bu
     if(_header->mode != finish)
         _header->errorCode = incorrect_frame_format;
 
+
     if(_header->errorCode != no_error)
         SET_1ST_BIT(_header->type);
     else
         UNSET_1ST_BIT(_header->type);
-    if(_frameSize < 12 || _frameSize < (_header->cmd2 + 6))
+
+    if( _frameSize < (_header->len + 6))
         return incorrect_frame_format;
 
     return _header->errorCode;
@@ -88,6 +90,7 @@ STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t 
     for(int i = 0; i < _dataLen; i++)
         _buffer[i + DATA_START_PLACE] = _data[i];
     _header->cmd2 = _dataLen;
+    _header->len = _dataLen + 6;
     return true;
 }
 STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer) {
@@ -118,10 +121,10 @@ STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer) {
     }
     _buffer[2] = (_header->cmd2 + HEADER_SIZE) & 0xff;//lsb
     _buffer[3] = (_header->cmd2 + HEADER_SIZE) >> 8; //msb
-
+    _header->len = _header->cmd2 + HEADER_SIZE;
     uint16_t crc = Crc16(_buffer + SOF_SIZE, _header->cmd2 + HEADER_SIZE + LEN_SIZE);
-    _buffer[_header->cmd2 + DATA_START_PLACE] = crc & 0xff;
-    _buffer[_header->cmd2 + DATA_START_PLACE + 1] = crc >> 8 ;
+    _buffer[_header->len + SOF_SIZE + LEN_SIZE] = crc & 0xff;
+    _buffer[_header->len + SOF_SIZE + LEN_SIZE + 1] = crc >> 8 ;
 
     return _buffer;
 }
@@ -229,7 +232,7 @@ void CreateHost(Host* _host, uint8_t* _dataBuffer, size_t _bufferSize, uint8_t _
 
 
     ChangeFrameType(_host, _req);
-
+    _host->header.len = 0;
     _host->header.cmd0 = _mpu;
     _host->header.cmd1 = _register;
     _host->header.cmd2 = 0;
@@ -304,6 +307,8 @@ static enum Error_code IsSlaveValid(Slave* _slave);
 
 void CreateSlave(Slave* _slave, uint8_t* _dataBuffer, size_t _bufferSize) {
 
+    _slave->header.len = 0;
+    _slave->header.type = 0;
     _slave->header.cmd2 = 0;
     _slave->header.errorCode   = no_error;
     _slave->frameSize   = 0;

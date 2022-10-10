@@ -120,14 +120,15 @@ static void DeserializeTest(void** state) {
     for(int i = 0; i < sizeof(_ReadRequestExample); i++)
         DeserializeFrame(&head3, slaveBuffer, _ReadRequestExample[i], &frameSize);
 
-    assert_int_equal(head.mode, finish);
+    assert_int_equal(head3.mode, finish);
     assert_int_equal(frameSize, sizeof(_ReadRequestExample));
     assert_memory_equal(slaveBuffer, _ReadRequestExample, sizeof(_ReadRequestExample));
     Slave stm;
     CreateSlave(&stm, slaveBuffer, 1024);
     stm.header = head3;
-
-    }
+    stm.frameSize = frameSize;
+    assert_int_not_equal(stm.IsValid(&stm), no_error);
+}
 static void IsValidTest(void** state) {
     (void) state;
 
