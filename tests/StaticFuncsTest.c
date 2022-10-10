@@ -3,7 +3,7 @@
 #include <setjmp.h>
 #include <stdio.h>
 
-#include "SCP.h"
+#include "../src/SCP.c"
 
 #include <cmocka.h>
 
@@ -123,7 +123,25 @@ static void IsValidTest(void** state) {
     ReadRequestExample[11] = 0xFC;
     assert_int_equal(IsValid(&head, ReadRequestExample,100, 2), incorrect_frame_format);
 }
+static void SetRegAddrTest(void** state) {
+    (void) state;
+    Host pc;
+    CreateHost(&pc, hostBuffer, 1024, 0x01, 0x12, REQR);
 
+    assert_int_equal(GET_REG_ADDR(pc), 0x12);
+    SetRegisterAddr(&pc, 0x14);
+    assert_int_equal(GET_REG_ADDR(pc), 0x14);
+}
+static void ChangeFrameTypeTest(void** state) {
+    (void) state;
+
+    Host pc;
+    CreateHost(&pc, hostBuffer, 1024, 0x01, 0x01, REQR);
+
+    assert_true(REQ_TYPE(pc));
+    ChangeFrameType(&pc, REQW);
+    assert_false(REQ_TYPE(pc));
+}
 
 int main(int argc, char** argv) {
 
@@ -135,6 +153,8 @@ int main(int argc, char** argv) {
                     unit_test(SerializeTest),
                     unit_test(DeserializeTest),
                     unit_test(IsValidTest),
+                    unit_test(SetRegAddrTest),
+                    unit_test(ChangeFrameTypeTest),
             };
 
 

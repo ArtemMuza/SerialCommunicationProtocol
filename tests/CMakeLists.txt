@@ -1,6 +1,5 @@
 project(tests C)
 
-if (TESTS)
     add_executable(CmockaTest CmockaTest.c)
     target_include_directories(CmockaTest PUBLIC ${CMOCKA_INCLUDE_DIR})
     target_link_libraries(CmockaTest  ${CMOCKA_STATIC_LIB})
@@ -12,7 +11,7 @@ if (TESTS)
     target_link_libraries(StaticTest  ${CMOCKA_STATIC_LIB})
     target_link_libraries(StaticTest  SCP)
     add_test(NAME StaticTest COMMAND StaticTest)
-endif ()
+
 
 
 

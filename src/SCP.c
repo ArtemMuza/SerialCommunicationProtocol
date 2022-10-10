@@ -39,12 +39,12 @@ static const unsigned short Crc16Table[256] = {
         0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
 };
 #ifndef UNIT_TESTS
-STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
-STATIC bool CheckType(uint8_t _type);
-STATIC bool CheckMPU(uint8_t _mpu);
-STATIC bool CheckRegisterAddr(uint16_t _addr);
+static uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
+static bool CheckType(uint8_t _type);
+static bool CheckMPU(uint8_t _mpu);
+static bool CheckRegisterAddr(uint16_t _addr);
 #endif
-STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bufferSize, int _frameSize) {
+static enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bufferSize, int _frameSize) {
 
     _header->errorCode = no_error;
     if(!_buffer || _bufferSize < 6)
@@ -81,7 +81,7 @@ STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bu
 
     return _header->errorCode;
 }
-STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen) {
+static bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen) {
     if(_dataLen > (MAX_PROTOCOL_LEN - HEADER_SIZE) || !_data || !_buffer)
         return false;
 
@@ -90,7 +90,7 @@ STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t 
     _header->cmd2 = _dataLen;
     return true;
 }
-STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer) {
+static uint8_t* Serialize(Header* _header, uint8_t* _buffer) {
     if(!_buffer)
         return NULL;
 
@@ -125,7 +125,7 @@ STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer) {
 
     return _buffer;
 }
-STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize) {
+static void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize) {
     switch (_header->mode) {
         case header: {
             switch (*_frameSize) {
@@ -156,7 +156,7 @@ STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _b
         }  break;
     }
 }
-STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize) {
+static void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize) {
     switch (_header->mode) {
         case empty: {
             _header->errorCode = no_error;
@@ -354,7 +354,7 @@ static uint8_t* CreateResponse(Slave* _slave) {
     return Serialize(&_slave->header, _slave->buffer);
 }
 
-STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)
+static uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)
 {
     uint16_t crc = 0xFFFF;
 
@@ -364,15 +364,15 @@ STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num)
     return crc;
 }
 
-STATIC bool CheckType(uint8_t _type) {
+static bool CheckType(uint8_t _type) {
     return !(_type & 0x70);
 }
-STATIC bool CheckMPU(uint8_t _mpu) {
+static bool CheckMPU(uint8_t _mpu) {
     if(_mpu == 0x00 || _mpu == 0xFF)
         return false;
     return true;
 }
-STATIC bool CheckRegisterAddr(uint16_t _addr){
+static bool CheckRegisterAddr(uint16_t _addr){
     if(_addr == 0x0000 || _addr == 0xFFFF)
         return false;
     return true;

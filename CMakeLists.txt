@@ -9,19 +9,14 @@ set(CMOCKA_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/cmocka)
 set(CMOCKA_INCLUDE_DIR ${CMOCKA_ROOT_DIR}/include)
 set(CMOCKA_STATIC_LIB cmocka)
 
-if (TESTS)
-add_definitions(-DUNIT_TESTS)
-endif()
 
 enable_testing()
 include_directories(include)
 
 add_subdirectory(cmocka)
-if (TESTS)
-    add_subdirectory(src build/testLib)
-else()
-    add_subdirectory(src build/lib)
-endif()
+
+add_subdirectory(src build/lib)
+
 
 add_subdirectory(tests build/tests)
 
