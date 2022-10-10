@@ -16,6 +16,8 @@ uint8_t ReadRequestExample[] = {
         0x01, 0x01, 0x05, 0x00, 0x00, 0x00,
         0xFC, 0xFC
 };
+uint8_t PayloadExample[] = { 0x01, 0x01, 0x02, 0x08 , 1,2,3,4,5,6,7,8};
+
 //tests
 static void CheckerTest(void** state) {
     (void)state;
@@ -84,7 +86,7 @@ static void SerializeTest(void** state) {
 }
 static void DeserializeTest(void** state) {
     (void) state;
-
+    //Full Deserialize
     Header  head = {0};
     int frameSize = 0;
 
@@ -94,6 +96,16 @@ static void DeserializeTest(void** state) {
     assert_int_equal(head.mode, finish);
     assert_int_equal(frameSize, 12);
     assert_memory_equal(slaveBuffer, ReadRequestExample, 12);
+
+    //Deserialize Payload
+    Header head2 = {0};
+    head2.mode = header;
+    frameSize = 4;
+   for(int i =0; i < 14; i++)
+        DeserializePayload(&head2, hostBuffer, PayloadExample[i], &frameSize);
+    assert_int_equal(head2.mode, data);
+    assert_int_equal(frameSize, 18);
+    assert_memory_equal(hostBuffer + 4, PayloadExample, 14);
 }
 static void IsValidTest(void** state) {
     (void) state;
@@ -142,6 +154,28 @@ static void ChangeFrameTypeTest(void** state) {
     ChangeFrameType(&pc, REQW);
     assert_false(REQ_TYPE(pc));
 }
+static void PackageSizeTest(void** state) {
+    (void) state;
+
+    //Creating Host | Slave
+    Host pc;
+    Slave stm;
+    CreateHost(&pc, hostBuffer, 1024, addr_linux, 18, REQR);
+    CreateSlave(&stm, slaveBuffer, 1024);
+
+
+    uint8_t* data = pc.CreateRequest(&pc);
+    assert_int_equal(REQUEST_SIZE(pc), 12);
+
+    for(int i = 0; i < REQUEST_SIZE(pc) ; i++)
+        stm.Read(&stm, *(data+i));
+
+    stm.WriteData(&stm, regData, 8);
+
+    data = stm.CreateResponse(&stm);
+    assert_int_equal(RESPONSE_SIZE(stm), 20);
+
+}
 
 int main(int argc, char** argv) {
 
@@ -155,6 +189,7 @@ int main(int argc, char** argv) {
                     unit_test(IsValidTest),
                     unit_test(SetRegAddrTest),
                     unit_test(ChangeFrameTypeTest),
+                    unit_test(PackageSizeTest),
             };
 
 
