@@ -106,7 +106,28 @@ static void DeserializeTest(void** state) {
     assert_int_equal(head2.mode, data);
     assert_int_equal(frameSize, 18);
     assert_memory_equal(hostBuffer + 4, PayloadExample, 14);
-}
+
+    //Additional variant
+    Header head3 = { 0};
+    frameSize = 0;
+    uint8_t _ReadRequestExample[] = {
+                        0xAA, 0x55,
+                        0x16, 0x00,
+                        0x01, 0x01, 0x05, 0x00, 0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,
+                        0xFC, 0xFC
+    };
+
+    for(int i = 0; i < sizeof(_ReadRequestExample); i++)
+        DeserializeFrame(&head3, slaveBuffer, _ReadRequestExample[i], &frameSize);
+
+    assert_int_equal(head.mode, finish);
+    assert_int_equal(frameSize, sizeof(_ReadRequestExample));
+    assert_memory_equal(slaveBuffer, _ReadRequestExample, sizeof(_ReadRequestExample));
+    Slave stm;
+    CreateSlave(&stm, slaveBuffer, 1024);
+    stm.header = head3;
+
+    }
 static void IsValidTest(void** state) {
     (void) state;
 

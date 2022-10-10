@@ -17,7 +17,6 @@ add_subdirectory(cmocka)
 
 add_subdirectory(src build/lib)
 
-
 add_subdirectory(tests build/tests)
 
 

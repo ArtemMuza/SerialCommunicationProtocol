@@ -9,7 +9,7 @@ project(tests C)
     add_executable(StaticTest StaticFuncsTest.c)
     target_include_directories(StaticTest PUBLIC ${CMOCKA_INCLUDE_DIR})
     target_link_libraries(StaticTest  ${CMOCKA_STATIC_LIB})
-    target_link_libraries(StaticTest  SCP)
+    target_link_libraries(StaticTest  SCPtest)
     add_test(NAME StaticTest COMMAND StaticTest)
 
 
