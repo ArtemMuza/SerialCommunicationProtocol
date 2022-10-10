@@ -1,6 +1,6 @@
 # # SerialCommunicationProtocol
 ## Install & build
-Build Lib:
+Build :
 ```bash
 git clone https://github.com/ArtemMuza/SerialCommunicationProtocol.git
 cd SerialCommunicationProtocol
@@ -12,17 +12,11 @@ Library out directory:
 ```
 SerialCommunicationProtocol/build/build/lib/libSCP.a
 ```
-Build tests:
-```bash
-cmake .. -DTESTS=True
-make
-```
 Tests out directory:
 ```
 SerialCommunicationProtocol/build/build/tests/
 ```
 
- - If you use "cmake .." but it builded tests, use "cmake .. -DTESTS=False"
 ## How to use
 - Allocating buffers for Host|Slave (max_length = 1024)
 ```c++
