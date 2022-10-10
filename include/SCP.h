@@ -138,9 +138,9 @@ typedef struct Slave{
 void CreateSlave(Slave* _slave, uint8_t* _dataBuffer, size_t _bufferSize);
 uint16_t GetSlavePackageSize(Slave* _slave);
 
-#define UNIT_TESTS
+
 #ifdef UNIT_TESTS
- #define STATIC
+#define STATIC
 
 uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
 bool CheckType(uint8_t _type);
