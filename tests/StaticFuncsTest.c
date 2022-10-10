@@ -98,7 +98,7 @@ static void DeserializeTest(void** state) {
 static void IsValidTest(void** state) {
     (void) state;
 
-    Header head = { 0x01, 0x01, 0x10, 0x00};
+    Header head = { 0x06,0x01, 0x01, 0x10, 0x00};
     enum Error_code err = no_error;
 
     head.mode = empty;

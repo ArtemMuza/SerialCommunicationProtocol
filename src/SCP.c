@@ -62,13 +62,13 @@ STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bu
     uint16_t crc = _buffer[_header->cmd2 + DATA_START_PLACE];
     crc += _buffer[_header->cmd2 + 1 + DATA_START_PLACE] << 8;
 
-    uint16_t Len = _buffer[2];
-    Len += _buffer[3] << 8;
-    if( _bufferSize < Len)
+
+    if( _bufferSize < _header->len)
         return incorrect_data_length;
 
-    if (crc != Crc16(_buffer + SOF_SIZE, Len + LEN_SIZE))
+    if (crc != Crc16(_buffer + SOF_SIZE, _header->len + LEN_SIZE))
         _header->errorCode = slave_data_integrity;
+
     if(_header->mode != finish)
         _header->errorCode = incorrect_frame_format;
 
@@ -181,14 +181,16 @@ STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byt
             if(*_frameSize == SOF_SIZE) {
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
+                _header->len = _byte;
             } else {
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
                 _header->mode = header;
+                _header->len += _byte << 8;
             }
         }  break;
         case fcs: {
-            if(*_frameSize < (_header->cmd2 + HEADER_SIZE + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
+            if(*_frameSize < (_header->len + SOF_SIZE + LEN_SIZE + FCS_SIZE - 1)) {
                 _buffer[*_frameSize] = _byte;
                 (*_frameSize)++;
             } else {
@@ -204,9 +206,8 @@ STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byt
             DeserializeFrame(_header, _buffer, _byte,  _frameSize);
         } break;
         default: {
-            uint16_t  Len = _buffer[2];
-            Len += _buffer[3] << 8;
-            if (*_frameSize < ( Len + LEN_SIZE + SOF_SIZE))
+
+            if (*_frameSize < ( _header->len + LEN_SIZE + SOF_SIZE))
                 DeserializePayload(_header, _buffer, _byte, _frameSize);
             else {
                 _header->mode = fcs;
@@ -225,7 +226,7 @@ static enum Error_code IsHostValid(Host* _host);
 static void ReadHost(Host* _host, uint8_t _byte);
 
 void CreateHost(Host* _host, uint8_t* _dataBuffer, size_t _bufferSize, uint8_t _mpu, uint16_t _register, enum Frame_type _req) {
-    //Add buffer  length handler
+
 
     ChangeFrameType(_host, _req);
 

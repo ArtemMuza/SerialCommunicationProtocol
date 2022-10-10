@@ -95,6 +95,7 @@ enum Work_mode {
 
 typedef struct Header{
 
+    uint16_t    len;
     uint8_t     type;
     uint8_t     cmd0; //MPU_ADDR
     uint16_t    cmd1; //REGISTER_ADDR
@@ -137,19 +138,23 @@ typedef struct Slave{
 void CreateSlave(Slave* _slave, uint8_t* _dataBuffer, size_t _bufferSize);
 uint16_t GetSlavePackageSize(Slave* _slave);
 
+#define UNIT_TESTS
 #ifdef UNIT_TESTS
-#define STATIC
-STATIC uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
-STATIC bool CheckType(uint8_t _type);
-STATIC bool CheckMPU(uint8_t _mpu);
-STATIC bool CheckRegisterAddr(uint16_t _addr);
+ #define STATIC
 
-STATIC bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen);
-STATIC uint8_t* Serialize(Header* _header, uint8_t* _buffer);
-STATIC void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
-STATIC enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bufferSize, int _frameSize);
-STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
+uint16_t Crc16( uint8_t *crc_arr, uint8_t crc_num);
+bool CheckType(uint8_t _type);
+bool CheckMPU(uint8_t _mpu);
+bool CheckRegisterAddr(uint16_t _addr);
+
+bool WriteData(Header* _header, uint8_t* _buffer, uint8_t* _data, size_t _dataLen);
+uint8_t* Serialize(Header* _header, uint8_t* _buffer);
+void     DeserializeFrame(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
+enum Error_code     IsValid(Header* _header, uint8_t* _buffer, size_t _bufferSize, int _frameSize);
+void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _byte, int* _frameSize);
+
 #else
 #define STATIC static
 #endif
+
 #endif
