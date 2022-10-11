@@ -5,37 +5,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-
-
-/*      Read me | How to use
- *
- *      .Before start, you must allocate byte array buffer (max-1024)
- *
- *      .Define Host/Slave struct
- *      .Use CreateHost func to set mpu_addr, register_addr, buffer, type(r|w)
- *      .Use CreateSlave func to set buffer
- *
- *      .Use WriteData pointer in Host struct if you want to write
- *      .Send 1st request by generating them from CreateRequest pointer(host) \
- *          and get request size by REQUEST_SIZE macro
- *
- *      .Handling Request by HandlingRequest pointer(slave)
- *      .On this moment you can to know it was R|W request by Slave side\
- *          use REQ_TYPE macro
- *
- *      .If it was writing req, you can to know:\
- *          GET_REG_ADDR - address of register to write
- *          GET_DATA_LEN - length of writing data
- *          GET_DATA_PTR - pointer to data array start
- *      .Use WriteData pointer in Slave struct if it was read req
- *
- *      .Use CreateResponse(slave) when you have been writing data to reg
- *      .Use HandlingResponse(host) to handle response and have ability to check errs
- *
- *      .Use IS_ERROR macro to check error in type field
- *
- *      .You can set error code by hand e.g. to show that slave is busy or timeout
- */
 #define SOF 0x55AA //Start of Frame
 
 #define REQ_TYPE(x) (x.header.type & 0x01) // True - read, False- write

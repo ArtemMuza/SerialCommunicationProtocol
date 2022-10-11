@@ -139,7 +139,7 @@ STATIC void     DeserializePayload(Header* _header, uint8_t* _buffer, uint8_t _b
                 case SOF_SIZE + LEN_SIZE + 2://cmd1(1)
                     _header->cmd1 = _byte;
                 case SOF_SIZE + LEN_SIZE + 3://cmd1(2)
-                    _header->cmd1 += _byte << 8;
+                    _header->cmd1 =( _byte << 8) + (_header->cmd1 & 0xFF);
                 case SOF_SIZE + LEN_SIZE + 4://cmd2(1)
                     _header->cmd2 = _byte;
                     _buffer[*_frameSize] = _byte;

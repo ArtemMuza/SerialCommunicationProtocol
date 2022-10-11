@@ -113,7 +113,11 @@ static void DeserializeTest(void** state) {
     uint8_t _ReadRequestExample[] = {
                         0xAA, 0x55,
                         0x16, 0x00,
-                        0x01, 0x01, 0x05, 0x00, 0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,
+                        0x01,
+                        0x01,
+                        0x05, 0x00,
+                        0x00, 0x00,
+                        0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B, 0x0C,0x0D,0x0E,0x0F,0x00,
                         0xFC, 0xFC
     };
 
@@ -202,12 +206,12 @@ static void PackageSizeTest(void** state) {
 int main(int argc, char** argv) {
 
     const struct UnitTest tests [] =
-            {
+            {unit_test(DeserializeTest),
                     unit_test(CheckerTest),
                     unit_test(CrcTest),
                     unit_test(WriteTest),
                     unit_test(SerializeTest),
-                    unit_test(DeserializeTest),
+
                     unit_test(IsValidTest),
                     unit_test(SetRegAddrTest),
                     unit_test(ChangeFrameTypeTest),
