@@ -1,2 +1,3 @@
-Core/Src/SCP.o: ../Core/Src/SCP.c ../Core/Inc/SCP.h
-../Core/Inc/SCP.h:
+Core/Src/SCP.o: C:/Users/AlnickoUser/CLionProjects/protocol/src/SCP.c \
+ ../../../include/SCP.h
+../../../include/SCP.h:
