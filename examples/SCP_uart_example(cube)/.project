@@ -29,16 +29,4 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>Core/Inc/SCP.h</name>
-			<type>1</type>
-			<location>C:/Users/AlnickoUser/CLionProjects/protocol/include/SCP.h</location>
-		</link>
-		<link>
-			<name>Core/Src/SCP.c</name>
-			<type>1</type>
-			<location>C:/Users/AlnickoUser/CLionProjects/protocol/src/SCP.c</location>
-		</link>
-	</linkedResources>
 </projectDescription>
