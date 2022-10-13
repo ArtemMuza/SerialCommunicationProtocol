@@ -23,6 +23,7 @@ Output file: example_name.elf
 Usage of Serial Communication Protocol between two uart
 
 Settings:
+   - Board  - Nucleo-LO73RZ
    - USART2 - Outputing logs (PA2-TX, PA3-RX)
    - USART4 - (PA0 - TX , PA1 - RX) (Host)
    - USART5 - (PC12 - TX, PD2 - RX) (Slave)
