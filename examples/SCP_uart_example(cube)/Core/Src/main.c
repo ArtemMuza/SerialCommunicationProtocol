@@ -447,6 +447,7 @@ void HostTask(void *argument)
     uint8_t byte = 0;
     uint8_t* data;
     TickType_t currentTick;
+    const char* timeout = "\r\nResponse waiting timeout\r\n\n";
     for(;;)
     {
         CreateHost(&pc, hostBuffer, 1024, addr_linux, 0x18, REQR);
@@ -497,6 +498,28 @@ void HostTask(void *argument)
 
         currentTick = xTaskGetTickCount();
         while((xTaskGetTickCount()- currentTick) < (1000));
+
+        //TIMEOUT
+        CreateHost(&pc, hostBuffer, 1024, addr_linux, 0x18, REQR);
+        HostOut(pc);
+
+        data = pc.CreateRequest(&pc);
+
+        //for(int i = 0; i < REQUEST_SIZE(pc); i++)
+        	//HAL_UART_Transmit(&huart2, data + i, 1, 100);
+
+
+         while(pc.header.mode != finish) {
+            if (HAL_UART_Receive(&huart2, &byte, 1, 1) != HAL_TIMEOUT)
+               pc.Read(&pc, byte);
+            else  {
+            	HAL_UART_Transmit(&huart2, (uint8_t*)timeout, 30, 100);
+            	break;
+            }
+         }
+         currentTick = xTaskGetTickCount();
+                 while((xTaskGetTickCount()- currentTick) < (1000));
+
     }
   /* USER CODE END 5 */
 }
