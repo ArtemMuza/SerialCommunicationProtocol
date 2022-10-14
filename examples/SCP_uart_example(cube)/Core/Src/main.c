@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "event_groups.h"
 #include "SCP.h"
 #include <stdio.h>
 #include <string.h>
@@ -34,6 +35,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define READ_SYNC  ( 1 << 0 )
+#define WRITE_SYNC ( 1 << 1 )
+#define ALL_SYNC ( READ_SYNC | WRITE_SYNC )
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,26 +53,19 @@ UART_HandleTypeDef huart5;
 /* Definitions for Host */
 osThreadId_t HostHandle;
 const osThreadAttr_t Host_attributes = {
-        .name = "Host",
-        .stack_size = 128 * 4,
-        .priority = (osPriority_t) osPriorityHigh,
+  .name = "Host",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for Slave */
 osThreadId_t SlaveHandle;
 const osThreadAttr_t Slave_attributes = {
-        .name = "Slave",
-        .stack_size = 128 * 4,
-        .priority = (osPriority_t) osPriorityHigh,
-};
-/* Definitions for myTask */
-osThreadId_t myTaskHandle;
-const osThreadAttr_t myTask_attributes = {
-        .name = "myTask",
-        .stack_size = 128 * 4,
-        .priority = (osPriority_t) osPriorityNormal,
+  .name = "Slave",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* USER CODE BEGIN PV */
-
+EventGroupHandle_t ioSync;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -79,7 +76,6 @@ static void MX_USART4_UART_Init(void);
 static void MX_USART5_UART_Init(void);
 void HostTask(void *argument);
 void SlaveTask(void *argument);
-void StartTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 void HostOut(Host _host);
@@ -99,86 +95,86 @@ char outputBuffer[1024];
   */
 int main(void)
 {
-    /* USER CODE BEGIN 1 */
+  /* USER CODE BEGIN 1 */
 
-    /* USER CODE END 1 */
+  /* USER CODE END 1 */
 
-    /* MCU Configuration--------------------------------------------------------*/
+  /* MCU Configuration--------------------------------------------------------*/
 
-    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-    HAL_Init();
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-    /* USER CODE BEGIN Init */
+  /* USER CODE BEGIN Init */
 
-    /* USER CODE END Init */
+  /* USER CODE END Init */
 
-    /* Configure the system clock */
-    SystemClock_Config();
+  /* Configure the system clock */
+  SystemClock_Config();
 
-    /* USER CODE BEGIN SysInit */
+  /* USER CODE BEGIN SysInit */
 
-    /* USER CODE END SysInit */
+  /* USER CODE END SysInit */
 
-    /* Initialize all configured peripherals */
-    MX_GPIO_Init();
-    MX_USART2_UART_Init();
-    MX_USART4_UART_Init();
-    MX_USART5_UART_Init();
-    /* USER CODE BEGIN 2 */
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART2_UART_Init();
+  MX_USART4_UART_Init();
+  MX_USART5_UART_Init();
+  /* USER CODE BEGIN 2 */
     const char* reset = "\r\nRESET\r\n";
     HAL_UART_Transmit(&huart2, (uint8_t*)reset, 9, 10);
-    /* USER CODE END 2 */
 
-    /* Init scheduler */
-    osKernelInitialize();
 
-    /* USER CODE BEGIN RTOS_MUTEX */
+  /* USER CODE END 2 */
+
+  /* Init scheduler */
+  osKernelInitialize();
+
+  /* USER CODE BEGIN RTOS_MUTEX */
     /* add mutexes, ... */
-    /* USER CODE END RTOS_MUTEX */
+  /* USER CODE END RTOS_MUTEX */
 
-    /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
     /* add semaphores, ... */
-    /* USER CODE END RTOS_SEMAPHORES */
+  /* USER CODE END RTOS_SEMAPHORES */
 
-    /* USER CODE BEGIN RTOS_TIMERS */
+  /* USER CODE BEGIN RTOS_TIMERS */
     /* start timers, add new ones, ... */
-    /* USER CODE END RTOS_TIMERS */
+  /* USER CODE END RTOS_TIMERS */
 
-    /* USER CODE BEGIN RTOS_QUEUES */
+  /* USER CODE BEGIN RTOS_QUEUES */
     /* add queues, ... */
-    /* USER CODE END RTOS_QUEUES */
+  /* USER CODE END RTOS_QUEUES */
 
-    /* Create the thread(s) */
-    /* creation of Host */
-    HostHandle = osThreadNew(HostTask, NULL, &Host_attributes);
+  /* Create the thread(s) */
+  /* creation of Host */
+  HostHandle = osThreadNew(HostTask, NULL, &Host_attributes);
 
-    /* creation of Slave */
-    SlaveHandle = osThreadNew(SlaveTask, NULL, &Slave_attributes);
+  /* creation of Slave */
+  SlaveHandle = osThreadNew(SlaveTask, NULL, &Slave_attributes);
 
-    /* creation of myTask */
-    myTaskHandle = osThreadNew(StartTask, NULL, &myTask_attributes);
-
-    /* USER CODE BEGIN RTOS_THREADS */
+  /* USER CODE BEGIN RTOS_THREADS */
     /* add threads, ... */
-    /* USER CODE END RTOS_THREADS */
+  /* USER CODE END RTOS_THREADS */
 
-    /* USER CODE BEGIN RTOS_EVENTS */
+  /* USER CODE BEGIN RTOS_EVENTS */
     /* add events, ... */
-    /* USER CODE END RTOS_EVENTS */
+  ioSync = xEventGroupCreate();
+  /* USER CODE END RTOS_EVENTS */
 
-    /* Start scheduler */
-    osKernelStart();
+  /* Start scheduler */
+  osKernelStart();
 
-    /* We should never get here as control is now taken by the scheduler */
-    /* Infinite loop */
-    /* USER CODE BEGIN WHILE */
+  /* We should never get here as control is now taken by the scheduler */
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
     while (1)
     {
-        /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-        /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
     }
-    /* USER CODE END 3 */
+  /* USER CODE END 3 */
 }
 
 /**
@@ -187,46 +183,46 @@ int main(void)
   */
 void SystemClock_Config(void)
 {
-    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-    RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-    /** Configure the main internal regulator output voltage
-    */
-    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-    /** Initializes the RCC Oscillators according to the specified parameters
-    * in the RCC_OscInitTypeDef structure.
-    */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-    RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-    RCC_OscInitStruct.MSICalibrationValue = 0;
-    RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_5;
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-    {
-        Error_Handler();
-    }
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+  RCC_OscInitStruct.MSICalibrationValue = 0;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_5;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-    /** Initializes the CPU, AHB and APB buses clocks
-    */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                                  |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-    {
-        Error_Handler();
-    }
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
-    PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-    {
-        Error_Handler();
-    }
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
+  PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /**
@@ -237,30 +233,30 @@ void SystemClock_Config(void)
 static void MX_USART2_UART_Init(void)
 {
 
-    /* USER CODE BEGIN USART2_Init 0 */
+  /* USER CODE BEGIN USART2_Init 0 */
 
-    /* USER CODE END USART2_Init 0 */
+  /* USER CODE END USART2_Init 0 */
 
-    /* USER CODE BEGIN USART2_Init 1 */
+  /* USER CODE BEGIN USART2_Init 1 */
 
-    /* USER CODE END USART2_Init 1 */
-    huart2.Instance = USART2;
-    huart2.Init.BaudRate = 115200;
-    huart2.Init.WordLength = UART_WORDLENGTH_8B;
-    huart2.Init.StopBits = UART_STOPBITS_1;
-    huart2.Init.Parity = UART_PARITY_NONE;
-    huart2.Init.Mode = UART_MODE_TX_RX;
-    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-    huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-    huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    if (HAL_UART_Init(&huart2) != HAL_OK)
-    {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN USART2_Init 2 */
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
 
-    /* USER CODE END USART2_Init 2 */
+  /* USER CODE END USART2_Init 2 */
 
 }
 
@@ -272,30 +268,30 @@ static void MX_USART2_UART_Init(void)
 static void MX_USART4_UART_Init(void)
 {
 
-    /* USER CODE BEGIN USART4_Init 0 */
+  /* USER CODE BEGIN USART4_Init 0 */
 
-    /* USER CODE END USART4_Init 0 */
+  /* USER CODE END USART4_Init 0 */
 
-    /* USER CODE BEGIN USART4_Init 1 */
+  /* USER CODE BEGIN USART4_Init 1 */
 
-    /* USER CODE END USART4_Init 1 */
-    huart4.Instance = USART4;
-    huart4.Init.BaudRate = 115200;
-    huart4.Init.WordLength = UART_WORDLENGTH_8B;
-    huart4.Init.StopBits = UART_STOPBITS_1;
-    huart4.Init.Parity = UART_PARITY_NONE;
-    huart4.Init.Mode = UART_MODE_TX_RX;
-    huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart4.Init.OverSampling = UART_OVERSAMPLING_16;
-    huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-    huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    if (HAL_UART_Init(&huart4) != HAL_OK)
-    {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN USART4_Init 2 */
+  /* USER CODE END USART4_Init 1 */
+  huart4.Instance = USART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART4_Init 2 */
 
-    /* USER CODE END USART4_Init 2 */
+  /* USER CODE END USART4_Init 2 */
 
 }
 
@@ -307,30 +303,30 @@ static void MX_USART4_UART_Init(void)
 static void MX_USART5_UART_Init(void)
 {
 
-    /* USER CODE BEGIN USART5_Init 0 */
+  /* USER CODE BEGIN USART5_Init 0 */
 
-    /* USER CODE END USART5_Init 0 */
+  /* USER CODE END USART5_Init 0 */
 
-    /* USER CODE BEGIN USART5_Init 1 */
+  /* USER CODE BEGIN USART5_Init 1 */
 
-    /* USER CODE END USART5_Init 1 */
-    huart5.Instance = USART5;
-    huart5.Init.BaudRate = 115200;
-    huart5.Init.WordLength = UART_WORDLENGTH_8B;
-    huart5.Init.StopBits = UART_STOPBITS_1;
-    huart5.Init.Parity = UART_PARITY_NONE;
-    huart5.Init.Mode = UART_MODE_TX_RX;
-    huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart5.Init.OverSampling = UART_OVERSAMPLING_16;
-    huart5.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-    huart5.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    if (HAL_UART_Init(&huart5) != HAL_OK)
-    {
-        Error_Handler();
-    }
-    /* USER CODE BEGIN USART5_Init 2 */
+  /* USER CODE END USART5_Init 1 */
+  huart5.Instance = USART5;
+  huart5.Init.BaudRate = 115200;
+  huart5.Init.WordLength = UART_WORDLENGTH_8B;
+  huart5.Init.StopBits = UART_STOPBITS_1;
+  huart5.Init.Parity = UART_PARITY_NONE;
+  huart5.Init.Mode = UART_MODE_TX_RX;
+  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart5.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart5.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART5_Init 2 */
 
-    /* USER CODE END USART5_Init 2 */
+  /* USER CODE END USART5_Init 2 */
 
 }
 
@@ -341,29 +337,29 @@ static void MX_USART5_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    /* GPIO Ports Clock Enable */
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_GPIOH_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_GPIOD_CLK_ENABLE();
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
-    /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
-    /*Configure GPIO pin : B1_Pin */
-    GPIO_InitStruct.Pin = B1_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : B1_Pin */
+  GPIO_InitStruct.Pin = B1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-    /*Configure GPIO pin : LD2_Pin */
-    GPIO_InitStruct.Pin = LD2_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -444,12 +440,13 @@ void SlaveOut(Slave _slave) {
 /* USER CODE END Header_HostTask */
 void HostTask(void *argument)
 {
-    /* USER CODE BEGIN 5 */
+  /* USER CODE BEGIN 5 */
     /* Infinite loop */
 
     Host pc;
     uint8_t byte = 0;
     uint8_t* data;
+    TickType_t currentTick;
     for(;;)
     {
         CreateHost(&pc, hostBuffer, 1024, addr_linux, 0x18, REQR);
@@ -458,22 +455,23 @@ void HostTask(void *argument)
         data = pc.CreateRequest(&pc);
 
         for(int i = 0; i < REQUEST_SIZE(pc); i++) {
+        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
             byte = *(data + i);
             HAL_UART_Transmit(&huart4, &byte, 1, 100);
-            taskYIELD();
 
         }
         while(pc.header.mode != finish) {
+        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
             if (HAL_UART_Receive(&huart4, &byte, 1, 100) != HAL_TIMEOUT)
                 pc.Read(&pc, byte);
-            else
-                taskYIELD();
         }
         if(pc.IsValid(&pc) == no_error) {
 
             //OUTPUT
         }
-        osDelay(100);
+        currentTick = xTaskGetTickCount();
+        while((xTaskGetTickCount()- currentTick) < (1000));
+
         CreateHost(&pc, hostBuffer, 1024, addr_linux, 0x18, REQW);
         byte = 0x33;
         pc.WriteData(&pc, &byte, 1);
@@ -482,25 +480,25 @@ void HostTask(void *argument)
 
 
         for(int i = 0; i < REQUEST_SIZE(pc); i++) {
+        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
             byte = *(data + i);
             HAL_UART_Transmit(&huart4, &byte, 1, 100);
-            taskYIELD();
         }
 
         while(pc.header.mode != finish) {
+        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
             if (HAL_UART_Receive(&huart4, &byte, 1, 100) != HAL_TIMEOUT)
                 pc.Read(&pc, byte);
-            else
-                taskYIELD();
         }
         if(pc.IsValid(&pc) == no_error) {
 
             //OUTPUT
         }
 
-        osDelay(5000);
+        currentTick = xTaskGetTickCount();
+        while((xTaskGetTickCount()- currentTick) < (1000));
     }
-    /* USER CODE END 5 */
+  /* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_SlaveTask */
@@ -512,7 +510,7 @@ void HostTask(void *argument)
 /* USER CODE END Header_SlaveTask */
 void SlaveTask(void *argument)
 {
-    /* USER CODE BEGIN SlaveTask */
+  /* USER CODE BEGIN SlaveTask */
     /* Infinite loop */
 
     Slave stm;
@@ -524,10 +522,9 @@ void SlaveTask(void *argument)
     {
 
         while(stm.header.mode != finish) {
+        	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
             if (HAL_UART_Receive(&huart5, &byte, 1, 100) != HAL_TIMEOUT)
                 stm.Read(&stm, byte);
-            else
-                taskYIELD();
         }
         if(stm.IsValid(&stm) == no_error) {
 
@@ -539,8 +536,8 @@ void SlaveTask(void *argument)
                 stm.WriteData(&stm, &byte, 1);
                 data = stm.CreateResponse(&stm);
                 for(int i =0; i < RESPONSE_SIZE(stm); i++) {
+                	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
                     HAL_UART_Transmit(&huart5, data + i, 1, 10);
-                    taskYIELD();
                 }
             } else {
                 //Write
@@ -548,8 +545,8 @@ void SlaveTask(void *argument)
                 //Get data by GET_DATA_PTR
                 data = stm.CreateResponse(&stm);
                 for(int i =0; i < RESPONSE_SIZE(stm); i++) {
+                	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
                     HAL_UART_Transmit(&huart5, data + i, 1, 10);
-                    taskYIELD();
                 }
 
             }
@@ -557,35 +554,15 @@ void SlaveTask(void *argument)
         } else {
             data = stm.CreateResponse(&stm);
             for(int i =0; i < RESPONSE_SIZE(stm); i++) {
+            	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
                 HAL_UART_Transmit(&huart5, data + i, 1, 10);
-                taskYIELD();
             }
 
         }
         SlaveOut(stm);
         CreateSlave(&stm, slaveBuffer, 1024);
     }
-    /* USER CODE END SlaveTask */
-}
-
-/* USER CODE BEGIN Header_StartTask */
-/**
-* @brief Function implementing the myTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTask */
-void StartTask(void *argument)
-{
-    /* USER CODE BEGIN StartTask */
-    /* Infinite loop */
-
-    for(;;)
-    {
-
-
-    }
-    /* USER CODE END StartTask */
+  /* USER CODE END SlaveTask */
 }
 
 /**
@@ -594,13 +571,13 @@ void StartTask(void *argument)
   */
 void Error_Handler(void)
 {
-    /* USER CODE BEGIN Error_Handler_Debug */
+  /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
     __disable_irq();
     while (1)
     {
     }
-    /* USER CODE END Error_Handler_Debug */
+  /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
