@@ -28,7 +28,6 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
-
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -57,7 +56,8 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern UART_HandleTypeDef huart4;
+extern UART_HandleTypeDef huart5;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -123,6 +123,21 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32l0xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles USART4 and USART5 interrupt.
+  */
+void USART4_5_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART4_5_IRQn 0 */
+
+  /* USER CODE END USART4_5_IRQn 0 */
+  HAL_UART_IRQHandler(&huart4);
+  HAL_UART_IRQHandler(&huart5);
+  /* USER CODE BEGIN USART4_5_IRQn 1 */
+
+  /* USER CODE END USART4_5_IRQn 1 */
+}
 
 /* USER CODE BEGIN 1 */
 

@@ -131,6 +131,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Alternate = GPIO_AF6_USART4;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+    /* USART4 interrupt Init */
+    HAL_NVIC_SetPriority(USART4_5_IRQn, 3, 0);
+    HAL_NVIC_EnableIRQ(USART4_5_IRQn);
   /* USER CODE BEGIN USART4_MspInit 1 */
 
   /* USER CODE END USART4_MspInit 1 */
@@ -163,6 +166,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Alternate = GPIO_AF6_USART5;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
+    /* USART5 interrupt Init */
+    HAL_NVIC_SetPriority(USART4_5_IRQn, 3, 0);
+    HAL_NVIC_EnableIRQ(USART4_5_IRQn);
   /* USER CODE BEGIN USART5_MspInit 1 */
 
   /* USER CODE END USART5_MspInit 1 */
@@ -210,6 +216,15 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_0|GPIO_PIN_1);
 
+    /* USART4 interrupt DeInit */
+  /* USER CODE BEGIN USART4:USART4_5_IRQn disable */
+    /**
+    * Uncomment the line below to disable the "USART4_5_IRQn" interrupt
+    * Be aware, disabling shared interrupt may affect other IPs
+    */
+    /* HAL_NVIC_DisableIRQ(USART4_5_IRQn); */
+  /* USER CODE END USART4:USART4_5_IRQn disable */
+
   /* USER CODE BEGIN USART4_MspDeInit 1 */
 
   /* USER CODE END USART4_MspDeInit 1 */
@@ -229,6 +244,15 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart)
     HAL_GPIO_DeInit(GPIOC, GPIO_PIN_12);
 
     HAL_GPIO_DeInit(GPIOD, GPIO_PIN_2);
+
+    /* USART5 interrupt DeInit */
+  /* USER CODE BEGIN USART5:USART4_5_IRQn disable */
+    /**
+    * Uncomment the line below to disable the "USART4_5_IRQn" interrupt
+    * Be aware, disabling shared interrupt may affect other IPs
+    */
+    /* HAL_NVIC_DisableIRQ(USART4_5_IRQn); */
+  /* USER CODE END USART5:USART4_5_IRQn disable */
 
   /* USER CODE BEGIN USART5_MspDeInit 1 */
 

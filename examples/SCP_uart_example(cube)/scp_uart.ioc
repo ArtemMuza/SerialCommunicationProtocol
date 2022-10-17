@@ -1,7 +1,6 @@
 #MicroXplorer Configuration settings - do not modify
-FREERTOS.Events01=
 FREERTOS.FootprintOK=true
-FREERTOS.IPParameters=Tasks01,FootprintOK,configUSE_NEWLIB_REENTRANT,Events01
+FREERTOS.IPParameters=Tasks01,FootprintOK,configUSE_NEWLIB_REENTRANT
 FREERTOS.Tasks01=Host,40,128,HostTask,Default,NULL,Dynamic,NULL,NULL;Slave,40,128,SlaveTask,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.configUSE_NEWLIB_REENTRANT=1
 File.Version=6
@@ -48,6 +47,7 @@ NVIC.SavedPendsvIrqHandlerGenerated=true
 NVIC.SavedSvcallIrqHandlerGenerated=true
 NVIC.SavedSystickIrqHandlerGenerated=true
 NVIC.SysTick_IRQn=true\:3\:0\:true\:false\:true\:true\:true\:true\:false
+NVIC.USART4_5_IRQn=true\:3\:0\:false\:false\:true\:true\:true\:true\:true
 PA0.Locked=true
 PA0.Mode=Asynchronous
 PA0.Signal=USART4_TX

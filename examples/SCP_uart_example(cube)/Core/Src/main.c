@@ -22,7 +22,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "event_groups.h"
 #include "SCP.h"
 #include <stdio.h>
 #include <string.h>
@@ -65,7 +64,6 @@ const osThreadAttr_t Slave_attributes = {
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* USER CODE BEGIN PV */
-EventGroupHandle_t ioSync;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -87,6 +85,7 @@ void SlaveOut(Slave _slave);
 uint8_t hostBuffer[1024];
 uint8_t slaveBuffer[1024];
 char outputBuffer[1024];
+const char* timeout = "\r\nResponse waiting timeout\r\n\n";
 /* USER CODE END 0 */
 
 /**
@@ -159,7 +158,6 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_EVENTS */
     /* add events, ... */
-  ioSync = xEventGroupCreate();
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -447,7 +445,7 @@ void HostTask(void *argument)
     uint8_t byte = 0;
     uint8_t* data;
     TickType_t currentTick;
-    const char* timeout = "\r\nResponse waiting timeout\r\n\n";
+
     for(;;)
     {
         CreateHost(&pc, hostBuffer, 1024, addr_linux, 0x18, REQR);
@@ -455,17 +453,15 @@ void HostTask(void *argument)
 
         data = pc.CreateRequest(&pc);
 
-        for(int i = 0; i < REQUEST_SIZE(pc); i++) {
-        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
-            byte = *(data + i);
-            HAL_UART_Transmit(&huart4, &byte, 1, 100);
+        for(int i = 0; i < REQUEST_SIZE(pc); i++)
+            HAL_UART_Transmit_IT(&huart4, data +i, 1);
 
-        }
-        while(pc.header.mode != finish) {
-        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
-            if (HAL_UART_Receive(&huart4, &byte, 1, 100) != HAL_TIMEOUT)
-                pc.Read(&pc, byte);
-        }
+
+        while(pc.header.mode != finish)
+        	if (HAL_UART_Receive_IT(&huart4, &byte, 1) == HAL_OK)
+        	    pc.Read(&pc, byte);
+
+
         if(pc.IsValid(&pc) == no_error) {
 
             //OUTPUT
@@ -480,17 +476,14 @@ void HostTask(void *argument)
         data = pc.CreateRequest(&pc);
 
 
-        for(int i = 0; i < REQUEST_SIZE(pc); i++) {
-        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
-            byte = *(data + i);
-            HAL_UART_Transmit(&huart4, &byte, 1, 100);
-        }
+        for(int i = 0; i < REQUEST_SIZE(pc); i++)
+            HAL_UART_Transmit_IT(&huart4, data+i, 1);
 
-        while(pc.header.mode != finish) {
-        	xEventGroupSync(ioSync, WRITE_SYNC, ALL_SYNC, portMAX_DELAY);
-            if (HAL_UART_Receive(&huart4, &byte, 1, 100) != HAL_TIMEOUT)
+
+        while(pc.header.mode != finish)
+            if (HAL_UART_Receive_IT(&huart4, &byte, 1) == HAL_OK)
                 pc.Read(&pc, byte);
-        }
+
         if(pc.IsValid(&pc) == no_error) {
 
             //OUTPUT
@@ -518,7 +511,7 @@ void HostTask(void *argument)
             }
          }
          currentTick = xTaskGetTickCount();
-                 while((xTaskGetTickCount()- currentTick) < (1000));
+         while((xTaskGetTickCount()- currentTick) < (1000));
 
     }
   /* USER CODE END 5 */
@@ -544,11 +537,10 @@ void SlaveTask(void *argument)
     for(;;)
     {
 
-        while(stm.header.mode != finish) {
-        	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
-            if (HAL_UART_Receive(&huart5, &byte, 1, 100) != HAL_TIMEOUT)
+        while(stm.header.mode != finish)
+            if (HAL_UART_Receive_IT(&huart5, &byte, 1) == HAL_OK)
                 stm.Read(&stm, byte);
-        }
+
         if(stm.IsValid(&stm) == no_error) {
 
             if(REQ_TYPE(stm)) {
@@ -558,28 +550,25 @@ void SlaveTask(void *argument)
                 byte = 0x34;
                 stm.WriteData(&stm, &byte, 1);
                 data = stm.CreateResponse(&stm);
-                for(int i =0; i < RESPONSE_SIZE(stm); i++) {
-                	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
-                    HAL_UART_Transmit(&huart5, data + i, 1, 10);
-                }
+                for(int i =0; i < RESPONSE_SIZE(stm); i++)
+                    HAL_UART_Transmit_IT(&huart5, data + i, 1);
+
             } else {
                 //Write
                 //Get register address by GET_REG_ADDR
                 //Get data by GET_DATA_PTR
                 data = stm.CreateResponse(&stm);
-                for(int i =0; i < RESPONSE_SIZE(stm); i++) {
-                	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
-                    HAL_UART_Transmit(&huart5, data + i, 1, 10);
-                }
+                for(int i =0; i < RESPONSE_SIZE(stm); i++)
+                    HAL_UART_Transmit_IT(&huart5, data + i, 1);
+
 
             }
 
         } else {
             data = stm.CreateResponse(&stm);
-            for(int i =0; i < RESPONSE_SIZE(stm); i++) {
-            	xEventGroupSync(ioSync, READ_SYNC, ALL_SYNC, portMAX_DELAY);
-                HAL_UART_Transmit(&huart5, data + i, 1, 10);
-            }
+            for(int i =0; i < RESPONSE_SIZE(stm); i++)
+                HAL_UART_Transmit_IT(&huart5, data + i, 1);
+
 
         }
         SlaveOut(stm);
