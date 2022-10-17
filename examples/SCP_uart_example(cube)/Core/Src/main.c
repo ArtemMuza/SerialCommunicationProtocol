@@ -453,9 +453,10 @@ void HostTask(void *argument)
 
         data = pc.CreateRequest(&pc);
 
-        for(int i = 0; i < REQUEST_SIZE(pc); i++)
-            HAL_UART_Transmit_IT(&huart4, data +i, 1);
-
+        for(int i = 0; i < REQUEST_SIZE(pc); i++) {
+        	byte =  *(data + i);
+        	HAL_UART_Transmit_IT(&huart4, data +i, 1);
+        }
 
         while(pc.header.mode != finish)
         	if (HAL_UART_Receive_IT(&huart4, &byte, 1) == HAL_OK)
